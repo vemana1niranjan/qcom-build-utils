@@ -1,0 +1,230 @@
+import os
+import shutil
+import subprocess
+import threading
+import argparse
+import importlib.util
+import re
+from pathlib import Path
+from queue import Queue
+from collections import defaultdict, deque
+from constants import *
+from helpers import check_if_root, logger, run_command, get_quote_terminal, run_command_for_result, check_and_append_line_in_file, create_new_directory
+from build_base_rootfs import build_base_rootfs
+from deb_organize import search_manifest_map_for_path
+
+class PackageBuilder:
+    def __init__(self, MOUNT_DIR, SOURCE_DIR, DEB_OUT_DIR, APT_SERVER_CONFIG, CHROOT_NAME, MANIFEST_MAP=None, TEMP_DIR=None):
+        if not check_if_root():
+            logger.error('Please run this script as root user.')
+            exit(1)
+        self.SOURCE_DIR = SOURCE_DIR
+        self.DEB_OUT_DIR = DEB_OUT_DIR
+        self.MOUNT_DIR = Path(MOUNT_DIR)
+        self.APT_SERVER_CONFIG = APT_SERVER_CONFIG
+        self.CHROOT_NAME = CHROOT_NAME
+        self.setup_chroot()
+        self.packages = {}  # Stores package metadata
+        # self.dependencies = defaultdict(set)  # Dependency graph
+        self.MANIFEST_MAP = MANIFEST_MAP
+        self.TEMP_DIR = self.DEB_OUT_DIR
+        if TEMP_DIR:
+            self.TEMP_DIR = TEMP_DIR
+
+    def generate_schroot_config(self):
+        if not os.path.exists(SCHROOT_CFG_PATH):
+            logger.error(f"{SCHROOT_CFG_PATH} not found.")
+            raise Exception()
+
+        with open(SCHROOT_CFG_PATH, "r") as template:
+            config_content = template.read()
+
+        config_content = config_content.replace("{{SBUILD_ENV_NAME}}", self.CHROOT_NAME)
+        config_content = config_content.replace("{{CHROOT_DIR}}", str(self.MOUNT_DIR))
+
+        SCHROOT_CONF_PATH = f"/etc/schroot/chroot.d/{self.CHROOT_NAME}.conf"
+        with open(SCHROOT_CONF_PATH, "w") as conf:
+            conf.write(config_content)
+
+        logger.info(f"Generated schroot environment configuration for {self.CHROOT_NAME}.")
+
+    def setup_chroot(self):
+        """Set up the schroot environment with necessary binaries and libraries."""
+
+        self.generate_schroot_config()
+
+        # TODO: Verify installation of dependencies before trying to install again
+        run_command(f"chroot {self.MOUNT_DIR} {get_quote_terminal()} -c \"apt-get install -f -y -qq\"")
+        run_command(f"chroot {self.MOUNT_DIR} {get_quote_terminal()} -c \"apt-get install -y sbuild schroot devscripts\"")
+
+        if self.APT_SERVER_CONFIG:
+            check_and_append_line_in_file(str(self.MOUNT_DIR / "etc/apt/sources.list"), self.APT_SERVER_CONFIG, True)
+
+    def load_packages(self):
+        """Load package metadata from build_config.py and fetch dependencies from control files."""
+        for root, dirs, files in os.walk(self.SOURCE_DIR):
+            if 'debian' in dirs:
+                root_name = Path(root).name
+                debian_dir = Path(os.path.join(root, 'debian'))
+
+                pkg_names, dependencies = self.get_packages_from_control(debian_dir / "control")
+
+                self.packages[root_name] = {
+                    "debian_dir": debian_dir,
+                    "repo_path": Path(root),
+                    "dependencies": dependencies,
+                    "packages": pkg_names,
+                    "visited": False
+                }
+
+    def get_packages_from_control(self, control_file):
+        """Extract package name from the control file."""
+        if not control_file.exists():
+            return []
+
+        packages = set()
+        dependencies = set()
+        found_build_depends = False
+        build_depends_lines = []
+
+        with open(control_file, "r") as f:
+            for line in f:
+                line_strip = line.strip()
+                if line.startswith('Package:'):
+                    packages.add(line_strip.split(':', 1)[1].strip())
+
+                elif line.startswith('Build-Depends:') and not found_build_depends:
+                    found_build_depends = True
+                    if line_strip.split(':', 1)[1].strip():
+                        build_depends_lines.append(line_strip.split(':', 1)[1].strip())
+
+                elif found_build_depends and line.startswith((" ", "\t")):
+                    if line_strip:
+                        build_depends_lines.append(line_strip)
+
+                elif found_build_depends and not line.startswith((" ", "\t")):
+                    found_build_depends = False
+
+        if build_depends_lines:
+            full_deps = " ".join(build_depends_lines)
+            dependencies.update(dep.split()[0] for dep in full_deps.split(", "))
+
+        if len(packages) == 0:
+            logger.error(f"Invalid control file at {control_file}")
+            exit(1)
+
+        return packages, dependencies
+
+    def detect_cycle(self):
+        """Detects cycles in the dependency graph using Kahn's Algorithm."""
+        graph = {}
+        in_degree = {}
+
+        sorted_order = []
+
+        if self.packages:
+            for repo in self.packages:
+                for binary in self.packages[repo]['packages']:
+                    in_degree[binary] = 0
+                    graph[binary] = []
+
+            for repo in self.packages:
+                for binary in self.packages[repo]['packages']:
+                    for dependency in self.packages[repo]['dependencies']:
+                        if dependency not in in_degree:
+                            in_degree[dependency] = 0
+                            graph[dependency] = []
+                        graph[dependency].append(binary)
+                        in_degree[binary] += 1
+
+            queue = deque([pkg for pkg in in_degree if in_degree[pkg] == 0])
+            if not queue:
+                logger.warning('No Package with in_degree 0, Possible cycle detected.')
+                min_pkg = min(in_degree, key=in_degree.get)
+                logger.warning(f'Forcing {min_pkg} into the queue.')
+                queue.append(min_pkg)
+
+            while queue:
+                pkg = queue.popleft()
+                sorted_order.append(pkg)
+                for dependent in graph[pkg]:
+                    in_degree[dependent] -= 1
+                    if in_degree[dependent] == 0:
+                        queue.append(dependent)
+
+            cycle_nodes = [pkg for pkg in in_degree if in_degree[pkg] > 0]
+
+            # cycle_edges = []
+            # if cycle_nodes:
+            #     for node in cycle_nodes:
+            #         for dep in self.dependencies.get(node, []):
+            #             if dep in cycle_nodes:
+            #                 cycle_edges.append((node, dep))
+
+            if len(cycle_nodes) > 0:
+                # TODO: Fetch the nodes causing a cyclic dependency
+                # logger.error('Cycle detected in dependencies for the following pairs:')
+                # for edge in cycle_edges:
+                #     logger.error(str(edge))
+                logger.error("Cycle detected in dependencies! Halting build.")
+                return
+            else:
+                logger.info('No cycle detected in dependencies.')
+
+        return sorted_order
+
+    def reorganize_deb_in_oss_prop(self, repo_path):
+        oss_or_prop = search_manifest_map_for_path(self.MANIFEST_MAP, self.SOURCE_DIR, repo_path)
+        for root, dirs, files in os.walk(self.TEMP_DIR):
+            for file in files:
+                if file.endswith('.deb'):
+                    pkg_name = file.split('_')[0]
+                    pkg_dir = os.path.join(self.DEB_OUT_DIR, oss_or_prop, pkg_name)
+                    create_new_directory(pkg_dir, delete_if_exists=True)
+                    shutil.move(os.path.join(root, file), os.path.join(pkg_dir, file))
+
+    def build_package(self, package):
+        """Builds a package inside the chroot environment."""
+        package_info = self.packages[package]
+
+        repo_path = package_info["repo_path"]
+        debian_dir = package_info["debian_dir"]
+        packages = package_info['packages']
+
+        logger.info(f"Building {packages}...")
+
+        os.chdir(repo_path)
+        create_new_directory(self.TEMP_DIR)
+
+        run_command(f"sbuild -A --arch=arm64 -d {self.CHROOT_NAME} --build-dir {self.TEMP_DIR} $(for deb in {self.DEB_OUT_DIR}/oss/*/*.deb; do echo \"--extra-package=$deb\"; done) $(for deb in {self.DEB_OUT_DIR}/prop/*/*.deb; do echo \"--extra-package=$deb\"; done)")
+
+        self.reorganize_deb_in_oss_prop(repo_path)
+
+        logger.info(f"{packages} built successfully!")
+
+    def build_all_packages(self):
+        """Builds all packages in dependency order."""
+        sorted_order = self.detect_cycle()  # Ensures dependencies are resolved before building
+        for pkg in sorted_order:
+            for package in self.packages:
+                if not self.packages[package]['visited']:
+                    if pkg in self.packages[package]['packages']:
+                        self.build_package(package)
+                        self.packages[package]['visited'] = True
+                        break
+
+    def build_specific_package(self, package_name):
+        """Builds a specific package along with its dependencies first."""
+        found = False
+        for package in self.packages:
+            if not self.packages[package]['visited']:
+                if package_name in self.packages[package]['packages']:
+                    for dep in self.packages[package]['dependencies']:
+                        self.build_specific_package(dep)
+                        self.packages[package]['visited'] = True
+                    self.build_package(package)
+                    found = True
+
+        if not found:
+            logger.error(f"Package '{package_name}' not found.")
+            return False
