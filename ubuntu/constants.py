@@ -19,6 +19,7 @@ KERNEL_DEBS = [
 COMBINED_DTB_FILE  = "combined-dtb.dtb"
 VMLINUX_QCOM_FILE  = "vmlinuz-qcom"
 IMAGE_NAME         = "system.img"
+IMAGE_STARTER_NAME = "system_starter.img"
 
 BOOT_PART_SIZE_IN_M = 512
 ROOT_PART_SIZE      = 100

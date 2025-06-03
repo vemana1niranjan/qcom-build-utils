@@ -1,12 +1,18 @@
 import os
 import shutil
-from helpers import run_command, logger, create_new_directory, check_if_root, umount_dir, check_and_append_line_in_file, cleanup_file
+from helpers import run_command, logger, create_new_directory, check_if_root, umount_dir, check_and_append_line_in_file, cleanup_file, run_command_for_result
 from constants import TERMINAL, HOST_FS_MOUNT
 
 def create_disk_image(IMAGE_NAME: str, BOOT_PART_SIZE_IN_M: int, ROOT_PART_SIZE: int, IMAGE_SIZE_IN_G: int):
     logger.info("Create disk image")
     sector_count = IMAGE_SIZE_IN_G * 1024
-    run_command(f"dd if=/dev/zero of={IMAGE_NAME} bs=1M count=$(({sector_count}))")
+    gen_out_cmd = f"dd if=/dev/zero of={IMAGE_NAME} bs=1M count=$(({sector_count}))"
+
+    gen_out = run_command_for_result(gen_out_cmd)
+    if gen_out['returncode'] != 0:
+        raise Exception(f"Error building image: {gen_out['output']}")
+    else:
+        logger.info(f"{IMAGE_NAME} Image created successfully.")
 
     logger.info("Create partitions")
     run_command(f"parted {IMAGE_NAME} mklabel gpt")
@@ -29,7 +35,7 @@ def bootstrap_ubuntu(MOUNT_DIR: str, loop_dev):
 
     run_command(f"mount {loop_dev}p2 {MOUNT_DIR}")
 
-    run_command(f"debootstrap --arch=arm64 noble {MOUNT_DIR} http://ports.ubuntu.com/ubuntu-ports/")
+    run_command(f"debootstrap --verbose --arch=arm64 noble {MOUNT_DIR} http://ports.ubuntu.com/ubuntu-ports/")
 
     # Mount filesystem
     for direc in HOST_FS_MOUNT:
@@ -41,11 +47,6 @@ def chroot_setup(MOUNT_DIR: str):
     run_command(f"chroot {MOUNT_DIR} {TERMINAL} -c 'apt update && apt install -y grub-efi-arm64 linux-image-generic initramfs-tools'")
     run_command(f"chroot {MOUNT_DIR} {TERMINAL} -c 'echo root:password | chpasswd'")
     check_and_append_line_in_file(f"{MOUNT_DIR}/etc/apt/sources.list", "deb http://ports.ubuntu.com/ubuntu-ports noble main universe multiverse restricted", True)
-
-def chroot_ssl_setup(MOUNT_DIR: str):
-    run_command(f"chroot {MOUNT_DIR} {TERMINAL} -c 'apt install -y wget'")
-    run_command(f"chroot {MOUNT_DIR} {TERMINAL} -c 'wget http://pki.qualcomm.com/ssl_v4_cert.crt -O /usr/local/share/ca-certificates/ssl_v4_cert.crt && wget http://pki.qualcomm.com/ssl_v2_cert.crt -O /usr/local/share/ca-certificates/ssl_v2_cert.crt && wget http://pki.qualcomm.com/qc_root_g2_cert.crt -O /usr/local/share/ca-certificates/qc_root_g2_cert.crt && /usr/sbin/update-ca-certificates'")
-    run_command(f"chroot {MOUNT_DIR} {TERMINAL} -c 'apt update'")
 
 def install_grub(MOUNT_DIR, loop_dev):
     logger.info("Install grub")
@@ -86,16 +87,16 @@ def cleanup(MOUNT_DIR, IMAGE_NAME, loop_dev):
     if IMAGE_NAME:
         cleanup_file(IMAGE_NAME)
 
-def build_base_rootfs(IMAGE_NAME: str, VMLINUZ_FILENAME: str, OUT_DIR: str, BOOT_PART_SIZE_IN_M: int, ROOT_PART_SIZE: int, IMAGE_SIZE_IN_G: int, GRUB_CFG_PATH, MOUNT_DIR="/mnt/sysroot", GEN_FINAL_IMAGE=True, CLEAN_LOOP_DEV=True):
+def build_base_rootfs(IMAGE_NAME: str, VMLINUZ_FILENAME: str, OUT_DIR: str, BOOT_PART_SIZE_IN_M: int, ROOT_PART_SIZE: int, IMAGE_SIZE_IN_G: int, GRUB_CFG_PATH, MOUNT_DIR="/mnt/sysroot", GEN_FINAL_IMAGE=True, CLEAN_LOOP_DEV=True, TEMP_DIR=None):
     if not check_if_root():
         logger.error('Please run this script as root user.')
         exit(1)
 
-    create_disk_image(IMAGE_NAME, BOOT_PART_SIZE_IN_M, ROOT_PART_SIZE, IMAGE_SIZE_IN_G)
-    loop_dev = setup_loop_device(IMAGE_NAME)
+    IMAGE_PATH = os.path.join(TEMP_DIR, IMAGE_NAME)
+    create_disk_image(IMAGE_PATH, BOOT_PART_SIZE_IN_M, ROOT_PART_SIZE, IMAGE_SIZE_IN_G)
+    loop_dev = setup_loop_device(IMAGE_PATH)
     bootstrap_ubuntu(MOUNT_DIR, loop_dev)
     chroot_setup(MOUNT_DIR)
-    chroot_ssl_setup(MOUNT_DIR)
     install_grub(MOUNT_DIR, loop_dev)
     install_vmlinux(MOUNT_DIR, VMLINUZ_FILENAME, GRUB_CFG_PATH, OUT_DIR)
 
@@ -105,5 +106,5 @@ def build_base_rootfs(IMAGE_NAME: str, VMLINUZ_FILENAME: str, OUT_DIR: str, BOOT
         logger.error(f"vmlinuz not installed in {MOUNT_DIR}")
         exit(1)
     if CLEAN_LOOP_DEV:
-        cleanup(MOUNT_DIR, IMAGE_NAME, loop_dev)
+        cleanup(MOUNT_DIR, IMAGE_PATH, loop_dev)
     return loop_dev
