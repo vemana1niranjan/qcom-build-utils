@@ -1,0 +1,26 @@
+#!/bin/sh
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE:-$0}")" && pwd)"
+export PATH="$SCRIPT_DIR:$PATH"
+VENV_DIR="$SCRIPT_DIR/qenv"
+
+if [ ! -d "$VENV_DIR" ]; then
+    python3 -m venv "$VENV_DIR"
+fi
+
+. "$VENV_DIR/bin/activate"
+
+if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+    missing=$("$VENV_DIR/bin/pip" install --dry-run --requirement "$SCRIPT_DIR/requirements.txt" 2>&1 | grep "Would install" || true)
+
+    if [ -n "$missing" ]; then
+        echo "Installing required dependencies from requirements.txt"
+        "$VENV_DIR/bin/pip" install -r "$SCRIPT_DIR/requirements.txt"
+        return 1
+    fi
+fi
+
+alias qubuild="$VENV_DIR/bin/python $SCRIPT_DIR/build.py"
+alias add-changelog="$SCRIPT_DIR/add-changelog"
+echo "qubuild is ready. Run \"qubuild --help\" for more info."
+echo "add-changelog is ready. Run \"add-changelog --help\" for more info."
