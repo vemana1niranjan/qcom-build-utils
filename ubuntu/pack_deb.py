@@ -14,7 +14,7 @@ from build_base_rootfs import build_base_rootfs
 from deb_organize import search_manifest_map_for_path
 
 class PackagePacker:
-    def __init__(self, MOUNT_DIR, IMAGE_TYPE, VARIANT, DEBIAN_INSTALL_DIR, OUT_DIR, OUT_SYSTEM_IMG, APT_SERVER_CONFIG, TEMP_DIR):
+    def __init__(self, MOUNT_DIR, IMAGE_TYPE, VARIANT, OUT_DIR, OUT_SYSTEM_IMG, APT_SERVER_CONFIG, TEMP_DIR, DEB_OUT_DIR, DEBIAN_INSTALL_DIR, IS_CLEANUP_ENABLED):
         if not check_if_root():
             logger.error('Please run this script as root user.')
             exit(1)
@@ -34,6 +34,11 @@ class PackagePacker:
 
         self.DEBS = []
         self.APT_SERVER_CONFIG = APT_SERVER_CONFIG
+
+        self.IS_CLEANUP_ENABLED = IS_CLEANUP_ENABLED
+
+        self.DEB_OUT_DIR = DEB_OUT_DIR
+        self.DEBIAN_INSTALL_DIR = DEBIAN_INSTALL_DIR
 
         self.parse_manifests()
         self.set_system_image()
@@ -105,6 +110,10 @@ sudo mmdebstrap --verbose --logfile={log_file} \
 --include={self.get_deb_list()} \
 noble \
 {self.MOUNT_DIR}"""
+
+        if self.DEB_OUT_DIR:
+            apt_command = build_deb_package_gz(self.DEB_OUT_DIR)
+            bash_command += f" \"{apt_command}\""
 
         if self.DEBIAN_INSTALL_DIR:
             apt_command = build_deb_package_gz(self.DEBIAN_INSTALL_DIR)

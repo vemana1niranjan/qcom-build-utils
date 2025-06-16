@@ -9,12 +9,12 @@ from pathlib import Path
 from queue import Queue
 from collections import defaultdict, deque
 from constants import *
-from helpers import check_if_root, logger, run_command, get_quote_terminal, check_and_append_line_in_file, create_new_directory
+from helpers import check_if_root, logger, run_command, get_quote_terminal, check_and_append_line_in_file, create_new_directory, build_deb_package_gz, run_command_for_result
 from build_base_rootfs import build_base_rootfs
 from deb_organize import search_manifest_map_for_path
 
 class PackageBuilder:
-    def __init__(self, MOUNT_DIR, SOURCE_DIR, DEB_OUT_DIR, APT_SERVER_CONFIG, CHROOT_NAME, MANIFEST_MAP=None, TEMP_DIR=None):
+    def __init__(self, MOUNT_DIR, SOURCE_DIR, APT_SERVER_CONFIG, CHROOT_NAME, MANIFEST_MAP=None, TEMP_DIR=None, DEB_OUT_DIR=None, DEB_OUT_DIR_APT=None, DEBIAN_INSTALL_DIR=None, DEBIAN_INSTALL_DIR_APT=None):
         if not check_if_root():
             logger.error('Please run this script as root user.')
             exit(1)
@@ -25,11 +25,15 @@ class PackageBuilder:
         self.CHROOT_NAME = CHROOT_NAME
         self.setup_chroot()
         self.packages = {}  # Stores package metadata
-        # self.dependencies = defaultdict(set)  # Dependency graph
+
         self.MANIFEST_MAP = MANIFEST_MAP
-        self.TEMP_DIR = self.DEB_OUT_DIR
-        if TEMP_DIR:
-            self.TEMP_DIR = TEMP_DIR
+
+        self.TEMP_DIR = TEMP_DIR
+
+        self.DEB_OUT_DIR = DEB_OUT_DIR
+        self.DEBIAN_INSTALL_DIR = DEBIAN_INSTALL_DIR
+        self.DEB_OUT_DIR_APT = DEB_OUT_DIR_APT
+        self.DEBIAN_INSTALL_DIR_APT = DEBIAN_INSTALL_DIR_APT
 
     def generate_schroot_config(self):
         if not os.path.exists(SCHROOT_CFG_PATH):
@@ -69,7 +73,7 @@ class PackageBuilder:
 
                 pkg_names, dependencies = self.get_packages_from_control(debian_dir / "control")
 
-                self.packages[root_name] = {
+                self.packages[str(debian_dir)] = {
                     "debian_dir": debian_dir,
                     "repo_path": Path(root),
                     "dependencies": dependencies,
@@ -196,7 +200,19 @@ class PackageBuilder:
         os.chdir(repo_path)
         create_new_directory(self.TEMP_DIR)
 
-        run_command(f"sbuild -A --arch=arm64 -d {self.CHROOT_NAME} --build-dir {self.TEMP_DIR} $(for deb in {self.DEB_OUT_DIR}/oss/*/*.deb; do echo \"--extra-package=$deb\"; done) $(for deb in {self.DEB_OUT_DIR}/prop/*/*.deb; do echo \"--extra-package=$deb\"; done)")
+        cmd = f"sbuild -A --arch=arm64 -d {self.CHROOT_NAME} --no-run-lintian --build-dir {self.TEMP_DIR} --build-dep-resolver=apt"
+
+        if self.DEB_OUT_DIR_APT:
+            build_deb_package_gz(self.DEB_OUT_DIR, start_server=False) # Rebuild Packages file
+            cmd += f" --extra-repository=\"{self.DEB_OUT_DIR_APT}\""
+
+        if self.DEBIAN_INSTALL_DIR_APT:
+            cmd += f" --extra-repository=\"{self.DEBIAN_INSTALL_DIR_APT}\""
+
+        if self.APT_SERVER_CONFIG:
+            cmd += f" --extra-repository=\"{self.APT_SERVER_CONFIG}\""
+
+        run_command(cmd, cwd=repo_path)
 
         self.reorganize_deb_in_oss_prop(repo_path)
 

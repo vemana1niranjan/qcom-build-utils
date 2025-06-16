@@ -8,7 +8,7 @@ from build_base_rootfs import build_base_rootfs
 from build_deb import PackageBuilder
 from constants import *
 from datetime import date
-from helpers import create_new_directory, mount_img, umount_dir, check_if_root, check_and_append_line_in_file, cleanup_file, logger, move_files_with_ext, cleanup_directory, change_folder_perm_read_write, print_build_logs, stop_local_apt_servers
+from helpers import create_new_directory, umount_dir, check_if_root, check_and_append_line_in_file, cleanup_file, logger, move_files_with_ext, cleanup_directory, change_folder_perm_read_write, print_build_logs, start_local_apt_server, build_deb_package_gz, mount_img
 from deb_organize import generate_manifest_map
 from pack_deb import PackagePacker
 
@@ -49,6 +49,17 @@ def parse_arguments():
                         help="Cleanup workspace after build", default=False)
 
     args = parser.parse_args()
+
+    # Absolute path checks
+    for path_arg, path_value in {
+       '--workspace': args.workspace,
+        '--debians-path': args.debians_path,
+        '--output-image-file': args.output_image_file,
+        '--input-image-file': args.input_image_file,
+    }.items():
+        if path_value and not os.path.isabs(path_value):
+            logger.error(f"Error: {path_arg} must be an absolute path.")
+            exit(1)
 
     return args
 
@@ -137,14 +148,22 @@ if IF_GEN_DEBIANS:
     builder = None
 
     try:
+        DEB_OUT_DIR_APT = None
+        DEBIAN_INSTALL_DIR_APT = None
+
+        if DEB_OUT_DIR and os.path.exists(DEB_OUT_DIR):
+            DEB_OUT_DIR_APT = build_deb_package_gz(DEB_OUT_DIR, start_server=True)
+        if DEBIAN_INSTALL_DIR and os.path.exists(DEBIAN_INSTALL_DIR):
+            DEBIAN_INSTALL_DIR_APT = build_deb_package_gz(DEBIAN_INSTALL_DIR, start_server=True)
+
         mount_img(SYSTEM_IMAGE, MOUNT_DIR)
-        builder = PackageBuilder(MOUNT_DIR, SOURCES_DIR, DEB_OUT_DIR, APT_SERVER_CONFIG, CHROOT_NAME, MANIFEST_MAP, TEMP_DIR)
+        builder = PackageBuilder(MOUNT_DIR, SOURCES_DIR, APT_SERVER_CONFIG, CHROOT_NAME, MANIFEST_MAP, TEMP_DIR, DEB_OUT_DIR, DEB_OUT_DIR_APT, DEBIAN_INSTALL_DIR, DEBIAN_INSTALL_DIR_APT)
         builder.load_packages()
         if BUILD_PACKAGE_NAME:
             # TODO: Check if package is available
             can_build = builder.build_specific_package(BUILD_PACKAGE_NAME)
             if not can_build:
-                exit(1)
+                raise Exception(f"Unable to build {BUILD_PACKAGE_NAME}")
         else:
             builder.build_all_packages()
 
@@ -168,7 +187,7 @@ if IF_PACK_IMAGE:
     cleanup_file(OUT_SYSTEM_IMG)
     create_new_directory(MOUNT_DIR)
     try:
-        packer = PackagePacker(MOUNT_DIR, IMAGE_TYPE, PACK_VARIANT, DEBIAN_INSTALL_DIR, OUT_DIR, OUT_SYSTEM_IMG, APT_SERVER_CONFIG, TEMP_DIR)
+        packer = PackagePacker(MOUNT_DIR, IMAGE_TYPE, PACK_VARIANT, OUT_DIR, OUT_SYSTEM_IMG, APT_SERVER_CONFIG, TEMP_DIR, DEB_OUT_DIR, DEBIAN_INSTALL_DIR, IS_CLEANUP_ENABLED)
 
         packer.build_image()
     except Exception as e:
@@ -177,9 +196,8 @@ if IF_PACK_IMAGE:
         ERROR_EXIT_BUILD = True
 
     finally:
-        stop_local_apt_servers()
+        umount_dir(MOUNT_DIR, UMOUNT_HOST_FS=True)
         if IS_CLEANUP_ENABLED:
-            umount_dir(MOUNT_DIR, UMOUNT_HOST_FS=True)
             cleanup_directory(MOUNT_DIR)
         if ERROR_EXIT_BUILD:
             exit(1)

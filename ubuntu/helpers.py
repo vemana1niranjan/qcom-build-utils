@@ -1,6 +1,7 @@
 import os
 import stat
 import shlex
+import random
 import shutil
 import logging
 import subprocess
@@ -10,13 +11,11 @@ from constants import TERMINAL, HOST_FS_MOUNT
 
 logging.basicConfig(
     level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    format="%(asctime)s || %(levelname)s || %(message)s",
+    datefmt="%H:%M:%S"
 )
 
-logger = logging.getLogger(__name__)
-
-servers = []
+logger = logging.getLogger("DEB-BUILD")
 
 def check_if_root() -> bool:
     return os.geteuid() == 0
@@ -218,8 +217,12 @@ def print_build_logs(directory):
         logger.error(content)
     logger.info("=====  Build Logs End  ======")
 
+def start_local_apt_server(direc):
+    server = AptServer(directory=direc, port=random.randint(7500, 8500))
+    server.start()
+    return f"deb [trusted=yes arch=arm64] http://localhost:{server.port} stable main"
 
-def build_deb_package_gz(direc) -> str:
+def build_deb_package_gz(direc, start_server=True) -> str:
     global servers
     try:
         packages_dir = os.path.join(direc, 'dists', 'stable', 'main', 'binary-arm64')
@@ -228,18 +231,13 @@ def build_deb_package_gz(direc) -> str:
         cmd = f'dpkg-scanpackages -m . /dev/null > {os.path.join(packages_dir, "Packages")}'
         run_command(cmd, cwd=direc)
 
+        packages_path = os.path.join(packages_dir, "Packages")
+        run_command(f"gzip -k -f {packages_path}")
+
         logger.info(f"Packages file created in {direc}")
     except Exception as e:
         logger.error(f"Error creating Packages file in {direc}, Ignoring.")
 
-    server = AptServer(directory=direc, port=8000)
-    server.start()
-    servers.append(server)
-    return f"deb [trusted=yes arch=arm64] http://localhost:{server.port} stable main"
-
-
-def stop_local_apt_servers():
-    global servers
-    for server in servers:
-        if server:
-            server.stop()
+    if start_server:
+        return start_local_apt_server(direc)
+    return None
