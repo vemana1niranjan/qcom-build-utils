@@ -1,8 +1,0 @@
-[{{SBUILD_ENV_NAME}}]
-description=Debian ARM64 sbuild chroot
-type=directory
-directory={{CHROOT_DIR}}
-users=sbuild
-root-users=root
-profile=sbuild
-preserve-environment=true

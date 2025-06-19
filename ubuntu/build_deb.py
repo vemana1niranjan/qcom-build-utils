@@ -9,12 +9,11 @@ from pathlib import Path
 from queue import Queue
 from collections import defaultdict, deque
 from constants import *
-from helpers import check_if_root, logger, run_command, get_quote_terminal, check_and_append_line_in_file, create_new_directory, build_deb_package_gz, run_command_for_result
-from build_base_rootfs import build_base_rootfs
+from helpers import check_if_root, logger, run_command, check_and_append_line_in_file, create_new_directory, build_deb_package_gz, run_command_for_result
 from deb_organize import search_manifest_map_for_path
 
 class PackageBuilder:
-    def __init__(self, MOUNT_DIR, SOURCE_DIR, APT_SERVER_CONFIG, CHROOT_NAME, MANIFEST_MAP=None, TEMP_DIR=None, DEB_OUT_DIR=None, DEB_OUT_DIR_APT=None, DEBIAN_INSTALL_DIR=None, DEBIAN_INSTALL_DIR_APT=None):
+    def __init__(self, MOUNT_DIR, SOURCE_DIR, APT_SERVER_CONFIG, CHROOT_NAME, MANIFEST_MAP=None, TEMP_DIR=None, DEB_OUT_DIR=None, DEB_OUT_DIR_APT=None, DEBIAN_INSTALL_DIR=None, DEBIAN_INSTALL_DIR_APT=None, IS_CLEANUP_ENABLED=True):
         if not check_if_root():
             logger.error('Please run this script as root user.')
             exit(1)
@@ -23,46 +22,36 @@ class PackageBuilder:
         self.MOUNT_DIR = Path(MOUNT_DIR)
         self.APT_SERVER_CONFIG = APT_SERVER_CONFIG
         self.CHROOT_NAME = CHROOT_NAME
-        self.setup_chroot()
-        self.packages = {}  # Stores package metadata
+
+        self.DIST = "noble"
+
+        self.packages = {}
 
         self.MANIFEST_MAP = MANIFEST_MAP
 
         self.TEMP_DIR = TEMP_DIR
+
+        self.IS_CLEANUP_ENABLED = IS_CLEANUP_ENABLED
 
         self.DEB_OUT_DIR = DEB_OUT_DIR
         self.DEBIAN_INSTALL_DIR = DEBIAN_INSTALL_DIR
         self.DEB_OUT_DIR_APT = DEB_OUT_DIR_APT
         self.DEBIAN_INSTALL_DIR_APT = DEBIAN_INSTALL_DIR_APT
 
-    def generate_schroot_config(self):
-        if not os.path.exists(SCHROOT_CFG_PATH):
-            logger.error(f"{SCHROOT_CFG_PATH} not found.")
-            raise Exception()
-
-        with open(SCHROOT_CFG_PATH, "r") as template:
-            config_content = template.read()
-
-        config_content = config_content.replace("{{SBUILD_ENV_NAME}}", self.CHROOT_NAME)
-        config_content = config_content.replace("{{CHROOT_DIR}}", str(self.MOUNT_DIR))
-
-        SCHROOT_CONF_PATH = f"/etc/schroot/chroot.d/{self.CHROOT_NAME}.conf"
-        with open(SCHROOT_CONF_PATH, "w") as conf:
-            conf.write(config_content)
-
-        logger.info(f"Generated schroot environment configuration for {self.CHROOT_NAME}.")
-
-    def setup_chroot(self):
-        """Set up the schroot environment with necessary binaries and libraries."""
-
         self.generate_schroot_config()
 
-        # TODO: Verify installation of dependencies before trying to install again
-        run_command(f"chroot {self.MOUNT_DIR} {get_quote_terminal()} -c \"apt-get install -f -y -qq\"")
-        run_command(f"chroot {self.MOUNT_DIR} {get_quote_terminal()} -c \"apt-get install -y sbuild schroot devscripts\"")
-
-        if self.APT_SERVER_CONFIG:
-            check_and_append_line_in_file(str(self.MOUNT_DIR / "etc/apt/sources.list"), self.APT_SERVER_CONFIG, True)
+    def generate_schroot_config(self):
+        logger.info(f"Generating schroot configuration for {self.CHROOT_NAME} at {self.MOUNT_DIR}")
+        if not os.path.exists(os.path.join(self.MOUNT_DIR, "root")):
+            out = run_command_for_result(f"sbuild-createchroot --arch=arm64 --chroot-suffix={self.CHROOT_NAME} {self.DIST} {self.MOUNT_DIR} http://ports.ubuntu.com")
+            if out['returncode'] != 0:
+                if self.IS_CLEANUP_ENABLED:
+                    cleanup_directory(self.MOUNT_DIR)
+                raise Exception(f"Error creating schroot environment: {out['output']}")
+            else:
+                logger.info(f"Schroot environment {self.CHROOT_NAME} created successfully.")
+        else:
+            logger.warning(f"Schroot environment {self.CHROOT_NAME} already exists at {self.MOUNT_DIR}. Skipping creation.")
 
     def load_packages(self):
         """Load package metadata from build_config.py and fetch dependencies from control files."""
@@ -212,7 +201,7 @@ class PackageBuilder:
         os.chdir(repo_path)
         create_new_directory(self.TEMP_DIR)
 
-        cmd = f"sbuild -A --arch=arm64 -d {self.CHROOT_NAME} --no-run-lintian --build-dir {self.TEMP_DIR} --build-dep-resolver=apt"
+        cmd = f"sbuild -A --arch=arm64 -d {self.DIST}-arm64{self.CHROOT_NAME} --no-run-lintian --build-dir {self.TEMP_DIR} --build-dep-resolver=apt"
 
         if self.DEB_OUT_DIR_APT:
             build_deb_package_gz(self.DEB_OUT_DIR, start_server=False) # Rebuild Packages file
@@ -226,7 +215,7 @@ class PackageBuilder:
 
         run_command(cmd, cwd=repo_path)
 
-        self.reorganize_dsc_in_oss_prop(repo_path)
+        # self.reorganize_dsc_in_oss_prop(repo_path)
         self.reorganize_deb_in_oss_prop(repo_path)
 
         logger.info(f"{packages} built successfully!")

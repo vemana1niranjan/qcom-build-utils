@@ -86,21 +86,6 @@ def run_command_for_result(command):
     except subprocess.CalledProcessError as e:
         return {"output": e.output.decode("utf-8", errors="ignore").strip(), "returncode": e.returncode}
 
-
-def clone_repo(repo_url, clone_path, depth=None):
-    if os.path.exists(clone_path):
-        logger.info(f"Repository already exists at {clone_path}. Skipping clone.")
-        return
-
-    logger.info(f"Cloning {repo_url}")
-    try:
-        if depth:
-            Repo.clone_from(repo_url, clone_path, depth=depth)
-        else:
-            Repo.clone_from(repo_url, clone_path)
-    except Exception as e:
-        logger.error(f"{e}")
-
 def set_env(key, value):
     os.environ[str(key)] = str(value)
 
@@ -163,20 +148,6 @@ def umount_dir(MOUNT_DIR, UMOUNT_HOST_FS=False):
         run_command(f"umount -l {MOUNT_DIR}")
     except:
         logger.warning(f"Failed to unmount {MOUNT_DIR}. Not mounted or busy. Ignoring.")
-
-def get_quote_terminal():
-    if not TERMINAL.startswith('/') or " " in TERMINAL or ";" in TERMINAL:
-        raise ValueError("Invalid TERMINAL path")
-
-    return shlex.quote(TERMINAL)
-
-def move_files_with_ext(SOURCE_DIR, DEST_DIR, EXT):
-    for filename in os.listdir(SOURCE_DIR):
-        if filename.endswith(EXT):
-            source_file = os.path.join(SOURCE_DIR, filename)
-            destination_file = os.path.join(DEST_DIR, filename)
-
-            shutil.move(source_file, destination_file)
 
 def change_folder_perm_read_write(DIR):
     try:
