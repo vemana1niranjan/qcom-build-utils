@@ -9,13 +9,33 @@ from git import Repo
 from apt_server import AptServer
 from constants import TERMINAL, HOST_FS_MOUNT
 
+class ColorFormatter(logging.Formatter):
+    COLORS = {
+        'DEBUG': '\033[94m', # Blue
+        'INFO': '\033[92m', # Green
+        'WARNING': '\033[93m', # Yellow
+        'ERROR': '\033[91m', # Red
+        'CRITICAL': '\033[95m', # Magenta
+    }
+    RESET = '\033[0m'
+
+    def format(self, record):
+        log_color = self.COLORS.get(record.levelname, self.RESET)
+        message = super().format(record)
+        return f"{log_color}{message}{self.RESET}"
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s || %(levelname)s || %(message)s",
     datefmt="%H:%M:%S"
 )
 
+handler = logging.StreamHandler()
+formatter = ColorFormatter('%(levelname)s: %(message)s')
+handler.setFormatter(formatter)
+
 logger = logging.getLogger("DEB-BUILD")
+logger.addHandler(handler)
 
 def check_if_root() -> bool:
     return os.geteuid() == 0
