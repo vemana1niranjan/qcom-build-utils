@@ -10,7 +10,6 @@ from queue import Queue
 from collections import defaultdict, deque
 from constants import *
 from helpers import create_new_file, check_if_root, logger, run_command, create_new_directory, run_command_for_result, mount_img, umount_dir, cleanup_file, build_deb_package_gz
-from build_base_rootfs import build_base_rootfs
 from deb_organize import search_manifest_map_for_path
 
 class PackagePacker:
@@ -30,7 +29,9 @@ class PackagePacker:
         self.OUT_DIR = OUT_DIR
         self.TEMP_DIR = TEMP_DIR
         self.OUT_SYSTEM_IMG = OUT_SYSTEM_IMG
+        
         self.EFI_BIN_PATH = os.path.join(self.OUT_DIR, "efi.bin")
+        self.EFI_MOUNT_PATH = os.path.join(self.MOUNT_DIR, "boot", "efi")
 
         self.DEBS = []
         self.APT_SERVER_CONFIG = APT_SERVER_CONFIG
@@ -46,14 +47,15 @@ class PackagePacker:
     def set_system_image(self):
         run_command(f"truncate -s {IMAGE_SIZE_IN_G}G {self.OUT_SYSTEM_IMG}")
         run_command(f"mkfs.ext4 -F -U $(uuidgen) {self.OUT_SYSTEM_IMG}")
-        run_command(f"mount -o loop {self.OUT_SYSTEM_IMG} {self.MOUNT_DIR}") # Mount happens here
+        run_command(f"mount -o loop {self.OUT_SYSTEM_IMG} {self.MOUNT_DIR}")
 
     def set_efi_bin(self):
         cleanup_file(self.EFI_BIN_PATH)
         run_command(f"dd if=/dev/zero of={self.EFI_BIN_PATH} bs=512 count=32768")
         run_command(f"mkfs.fat -F16 -s 8 -h 2048 -n EFI {self.EFI_BIN_PATH}")
-        create_new_directory(f"{self.MOUNT_DIR}/boot/efi")
-        run_command(f"mount -o loop {self.EFI_BIN_PATH} {os.path.join(self.MOUNT_DIR, 'boot', 'efi')}") # Mount happens here
+
+        create_new_directory(self.EFI_MOUNT_PATH)
+        run_command(f"mount -o loop {self.EFI_BIN_PATH} {self.EFI_MOUNT_PATH}")
         grub_update_cmd = f"""echo 'GRUB_CMDLINE_LINUX="ro earlycon earlyprintk console=ttyMSM0,115200,n8 $vt_handoff qcom_scm.download_mode=1 panic=reboot_warm"
 GRUB_DEVICE="/dev/disk/by-partlabel/system"
 GRUB_TERMINAL="console"
@@ -123,8 +125,6 @@ noble \
             bash_command += f" \"{self.APT_SERVER_CONFIG}\""
 
         bash_command += f" \"deb [arch=arm64 trusted=yes] http://ports.ubuntu.com/ubuntu-ports noble main universe multiverse restricted\""
-        bash_command += f" \"deb [arch=arm64 trusted=yes] http://ports.ubuntu.com/ubuntu-ports noble-updates main universe multiverse restricted\""
-        bash_command += f" \"deb [arch=arm64 trusted=yes] http://ports.ubuntu.com/ubuntu-ports noble-security main universe multiverse restricted\""
 
         out = run_command_for_result(bash_command)
         if out['returncode'] != 0:
@@ -133,10 +133,31 @@ noble \
             logger.info("Image built successfully.")
 
         # Set efi.bin
-        self.set_efi_bin()
+        try:
+            self.set_efi_bin()
+        except Exception as e:
+            logger.error(f"Error setting EFI binary: {e}")
+            if self.IS_CLEANUP_ENABLED:
+                umount_dir(self.EFI_MOUNT_PATH)
+            raise Exception(e)
 
         mount_img(self.OUT_SYSTEM_IMG, self.MOUNT_DIR, MOUNT_HOST_FS=True, MOUNT_IMG=False)
-        run_command(f"chroot {self.MOUNT_DIR} {TERMINAL} -c 'grub-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu'")
-        run_command(f"chroot {self.MOUNT_DIR} {TERMINAL} -c 'update-grub'")
-        umount_dir(f"{self.MOUNT_DIR}/boot/efi")
-        umount_dir(self.MOUNT_DIR, UMOUNT_HOST_FS=True)
+
+        out = run_command_for_result(f"chroot {self.MOUNT_DIR} {TERMINAL} -c 'grub-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu'")
+        if out['returncode'] != 0:
+            if self.IS_CLEANUP_ENABLED:
+                umount_dir(self.EFI_MOUNT_PATH)
+            raise Exception(f"Error installing grub: {out['output']}")
+        else:
+            logger.info("Grub installed successfully.")
+            out = run_command_for_result(f"chroot {self.MOUNT_DIR} {TERMINAL} -c 'update-grub'")
+            if out['returncode'] != 0:
+                if self.IS_CLEANUP_ENABLED:
+                    umount_dir(self.EFI_MOUNT_PATH)
+                raise Exception(f"Error updating grub: {out['output']}")
+            else:
+                logger.info("Grub updated successfully.")
+
+        if self.IS_CLEANUP_ENABLED:
+            umount_dir(self.EFI_MOUNT_PATH)
+            umount_dir(self.MOUNT_DIR, UMOUNT_HOST_FS=True)
