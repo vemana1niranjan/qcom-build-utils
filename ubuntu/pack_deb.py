@@ -54,7 +54,7 @@ class PackagePacker:
         run_command(f"mkfs.fat -F16 -s 8 -h 2048 -n EFI {self.EFI_BIN_PATH}")
         create_new_directory(f"{self.MOUNT_DIR}/boot/efi")
         run_command(f"mount -o loop {self.EFI_BIN_PATH} {os.path.join(self.MOUNT_DIR, 'boot', 'efi')}") # Mount happens here
-        grub_update_cmd = f"""echo 'GRUB_CMDLINE_LINUX="ro earlycon earlyprintk console=ttyMSM0,115200,n8 $vt_handoff"
+        grub_update_cmd = f"""echo 'GRUB_CMDLINE_LINUX="ro earlycon earlyprintk console=ttyMSM0,115200,n8 $vt_handoff qcom_scm.download_mode=1 panic=reboot_warm"
 GRUB_DEVICE="/dev/disk/by-partlabel/system"
 GRUB_TERMINAL="console"
 GRUB_DISABLE_LINUX_UUID="true"
