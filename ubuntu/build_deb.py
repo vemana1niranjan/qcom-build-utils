@@ -211,7 +211,9 @@ class PackageBuilder:
             cmd += f" --extra-repository=\"{self.DEBIAN_INSTALL_DIR_APT}\""
 
         if self.APT_SERVER_CONFIG:
-            cmd += f" --extra-repository=\"{self.APT_SERVER_CONFIG}\""
+            for config in self.APT_SERVER_CONFIG:
+                if config.strip():
+                    cmd += f" --extra-repository=\"{config.strip()}\""
 
         run_command(cmd, cwd=repo_path)
 
