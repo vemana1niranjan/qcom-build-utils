@@ -15,7 +15,7 @@ from pack_deb import PackagePacker
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Process command line arguments.")
 
-    parser.add_argument('--apt-server-config', type=str, required=False,
+    parser.add_argument('--apt-server-config', type=str, required=False, default="deb [arch=arm64 trusted=yes] http://pkg.qualcomm.com noble/stable main",
                         help='APT Server configuration to use')
     parser.add_argument('--mount_dir', type=str, required=False,
                         help='Mount directoryfor builds (default: <workspace>/build)')
@@ -25,8 +25,10 @@ def parse_arguments():
                         help='Build starter image')
     parser.add_argument('--build-kernel', action='store_true', default=False,
                         help='Build kernel')
-    parser.add_argument('--kernel-dir', type=str, required=False,
+    parser.add_argument('--kernel-src-dir', type=str, required=False,
                         help='Kernel directory (default: <workspace>/kernel)')
+    parser.add_argument('--kernel-dest-dir', type=str, required=False,
+                        help='Kernel out directory (default: <workspace>/debian_packages/oss)')
     parser.add_argument('--flavor', type=str, choices=['server', 'desktop'], default='server',
                         help='Image flavor (only server or desktop, default: server)')
     parser.add_argument('--debians-path', type=str, required=False,
@@ -52,7 +54,7 @@ def parse_arguments():
 
     # Absolute path checks
     for path_arg, path_value in {
-       '--workspace': args.workspace,
+       '--workspace': args.workspace,'--kernel-dest-dir': args.kernel_dest_dir,
         '--debians-path': args.debians_path,
         '--output-image-file': args.output_image_file,
         '--input-image-file': args.input_image_file,
@@ -92,6 +94,7 @@ OUT_DIR = os.path.join(WORKSPACE_DIR, "out")
 DEB_OUT_DIR = os.path.join(WORKSPACE_DIR, "debian_packages")
 
 OSS_DEB_OUT_DIR = os.path.join(DEB_OUT_DIR, "oss")
+KERNEL_DEB_OUT_DIR = args.kernel_dest_dir if args.kernel_dest_dir else OSS_DEB_OUT_DIR
 PROP_DEB_OUT_DIR = os.path.join(DEB_OUT_DIR, "prop")
 TEMP_DIR = os.path.join(DEB_OUT_DIR, "temp")
 
@@ -102,6 +105,7 @@ if not check_if_root():
 create_new_directory(WORKSPACE_DIR, delete_if_exists=False)
 create_new_directory(MOUNT_DIR, delete_if_exists=False)
 create_new_directory(KERNEL_DIR, delete_if_exists=False)
+create_new_directory(KERNEL_DEB_OUT_DIR, delete_if_exists=False)
 create_new_directory(SOURCES_DIR, delete_if_exists=False)
 create_new_directory(OUT_DIR, delete_if_exists=False)
 create_new_directory(DEB_OUT_DIR, delete_if_exists=False)
@@ -120,7 +124,7 @@ if IN_SYSTEM_IMG is None and not SKIP_STARTER_IMAGE:
         if IF_BUILD_KERNEL:
             os.chdir(WORKSPACE_DIR)
             build_kernel(KERNEL_DIR)
-            reorganize_kernel_debs(WORKSPACE_DIR, OSS_DEB_OUT_DIR)
+            reorganize_kernel_debs(WORKSPACE_DIR, KERNEL_DEB_OUT_DIR)
 
         build_dtb(OSS_DEB_OUT_DIR, LINUX_MODULES_DEB, COMBINED_DTB_FILE, OUT_DIR)
 
