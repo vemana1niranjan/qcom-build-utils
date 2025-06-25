@@ -15,7 +15,7 @@ from pack_deb import PackagePacker
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Process command line arguments.")
 
-    parser.add_argument('--apt-server-config', type=str, required=False,
+    parser.add_argument('--apt-server-config', type=str, required=False, default="deb [arch=arm64 trusted=yes] http://pkg.qualcomm.com noble/stable main",
                         help='APT Server configuration to use')
     parser.add_argument('--mount_dir', type=str, required=False,
                         help='Mount directoryfor builds (default: <workspace>/build)')
