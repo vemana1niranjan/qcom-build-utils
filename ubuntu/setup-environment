@@ -16,11 +16,8 @@ if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
     if [ -n "$missing" ]; then
         echo "Installing required dependencies from requirements.txt"
         "$VENV_DIR/bin/pip" install -r "$SCRIPT_DIR/requirements.txt"
-        return 1
     fi
 fi
 
-alias qubuild="$VENV_DIR/bin/python $SCRIPT_DIR/build.py"
-alias add-changelog="$SCRIPT_DIR/add-changelog"
 echo "qubuild is ready. Run \"qubuild --help\" for more info."
 echo "add-changelog is ready. Run \"add-changelog --help\" for more info."
