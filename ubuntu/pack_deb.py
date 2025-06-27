@@ -122,7 +122,9 @@ noble \
             bash_command += f" \"{apt_command}\""
 
         if self.APT_SERVER_CONFIG:
-            bash_command += f" \"{self.APT_SERVER_CONFIG}\""
+            for config in self.APT_SERVER_CONFIG:
+                if config.strip():
+                    bash_command += f" \"{config.strip()}\""
 
         bash_command += f" \"deb [arch=arm64 trusted=yes] http://ports.ubuntu.com/ubuntu-ports noble main universe multiverse restricted\""
 

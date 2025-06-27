@@ -115,9 +115,9 @@ create_new_directory(OSS_DEB_OUT_DIR, delete_if_exists=False)
 create_new_directory(PROP_DEB_OUT_DIR, delete_if_exists=False)
 create_new_directory(TEMP_DIR, delete_if_exists=True)
 
-APT_SERVER_CONFIG = args.apt_server_config.strip() if args.apt_server_config else None
-
+APT_SERVER_CONFIG = [config.strip() for config in args.apt_server_config.split(',')] if args.apt_server_config else None
 MANIFEST_MAP = generate_manifest_map(WORKSPACE_DIR)
+APT_SERVER_CONFIG = list(set(APT_SERVER_CONFIG)) if APT_SERVER_CONFIG else None
 
 ERROR_EXIT_BUILD = False
 
