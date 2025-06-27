@@ -1,9 +1,32 @@
+"""
+build_kernel.py
+
+This script is designed to build a kernel from a specified source directory for the ARM64 architecture.
+It requires root privileges to execute and utilizes various helper functions for environment setup,
+logging, and file management.
+"""
+
 from helpers import check_if_root, logger, check_and_append_line_in_file, set_env, create_new_directory
 import os
 import shutil
 import subprocess
 
 def build_kernel(source_dir: str):
+    """
+    Builds the kernel for ARM64 architecture from the specified source directory.
+
+    Args:
+    _____
+    - source_dir (str): Path to the kernel source directory
+
+    Raises:
+    _______
+    - SystemExit: If not run as root or if any build step fails
+
+    Note:
+    _____
+    - This function must be executed with root privileges
+    """
     if not check_if_root():
         logger.error('Please run this script as root user.')
         exit(1)
@@ -41,6 +64,22 @@ def build_kernel(source_dir: str):
         exit(1)
 
 def reorganize_kernel_debs(WORKSPACE_DIR, DEB_OUT_DIR):
+    """
+    Reorganizes generated Debian packages (.deb files) into package-specific directories.
+
+    Scans the workspace directory for .deb files and moves each package to its own
+    subdirectory within the output directory. The subdirectory name is derived from
+    the package name (first part before '_' in the filename).
+
+    Args:
+    _____
+    - WORKSPACE_DIR (str): Directory containing the generated .deb files
+    - DEB_OUT_DIR (str): Target directory where package-specific subdirectories will be created
+
+    Note:
+    -----
+    - Creates new directories as needed but won't delete existing ones
+    """
     for root, dirs, files in os.walk(WORKSPACE_DIR):
         for file in files:
             if file.endswith('.deb'):

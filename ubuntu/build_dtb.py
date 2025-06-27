@@ -1,3 +1,12 @@
+'''
+build_dtb.py
+
+This script provides functionality to build a combined Device Tree Blob (DTB) from a Debian package.
+It extracts the specified .deb file, searches for a specific DTB file within the extracted contents,
+and creates a VFAT partition to store the DTB file. The script requires root privileges to execute
+and handles errors related to file extraction and processing.
+'''
+
 import os
 import glob
 import shlex
@@ -6,6 +15,24 @@ import subprocess
 from helpers import logger, cleanup_directory, check_if_root
 
 def build_dtb(deb_dir, deb_file_regex, combined_dtb_filename, out_dir):
+    """
+    Build a combined Device Tree Blob (DTB) from a Debian package.
+
+    This function extracts a specified .deb package, searches for a specific DTB file
+    within the extracted contents, and then creates a VFAT partition to store the DTB file.
+
+    Args:
+    -----
+    - deb_dir (str): The directory containing the .deb files.
+    - deb_file_regex (str): The regex pattern to match the .deb file.
+    - combined_dtb_filename (str): The name of the DTB file to extract from the .deb package.
+    - out_dir (str): The output directory where the combined DTB binary will be created.
+
+    Raises:
+    -------
+    - SystemExit: If the script is not run as root, if no matching .deb files are found,
+                  or if there are errors during extraction or processing.
+    """
     if not check_if_root():
         logger.error('Please run this script as root user.')
         exit(1)
