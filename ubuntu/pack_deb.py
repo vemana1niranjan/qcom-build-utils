@@ -108,6 +108,7 @@ GRUB_DISABLE_RECOVERY="true"' >> {os.path.join(self.MOUNT_DIR, 'etc', 'default',
 sudo mmdebstrap --verbose --logfile={log_file} \
 --customize-hook='echo root:password | chroot "$1" chpasswd' \
 --setup-hook='echo /dev/disk/by-partlabel/system / ext4 defaults 0 1 > "$1/etc/fstab"' \
+--setup-hook='echo "PermitRootLogin yes" > "$1/etc/ssh/sshd_config"' \
 --arch=arm64 \
 --include={self.get_deb_list()} \
 noble \
