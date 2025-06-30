@@ -10,3 +10,7 @@ qcom-syslog-plumber-dev
 qcom-adreno1
 qcom-fastcv-binaries1
 qcom-fastcv-binaries-dev
+qcom-dspservices-headers-dev
+qcom-fastrpc1
+qcom-fastrpc-dev
+qcom-securedsp-example-dev
