@@ -43,7 +43,7 @@ class PackageBuilder:
     def generate_schroot_config(self):
         logger.info(f"Generating schroot configuration for {self.CHROOT_NAME} at {self.MOUNT_DIR}")
         if not os.path.exists(os.path.join(self.MOUNT_DIR, "root")):
-            out = run_command_for_result(f"sbuild-createchroot --arch=arm64 --chroot-suffix={self.CHROOT_NAME} {self.DIST} {self.MOUNT_DIR} http://ports.ubuntu.com")
+            out = run_command_for_result(f"sbuild-createchroot --arch=arm64 --chroot-suffix={self.CHROOT_NAME} --components=main,universe {self.DIST} {self.MOUNT_DIR} http://ports.ubuntu.com")
             if out['returncode'] != 0:
                 if self.IS_CLEANUP_ENABLED:
                     cleanup_directory(self.MOUNT_DIR)
