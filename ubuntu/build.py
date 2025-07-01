@@ -174,6 +174,7 @@ if IF_PACK_IMAGE:
     cleanup_file(OUT_SYSTEM_IMG)
     create_new_directory(MOUNT_DIR)
     try:
+        build_dtb(KERNEL_DEB_OUT_DIR, LINUX_MODULES_DEB, COMBINED_DTB_FILE, OUT_DIR)
         packer = PackagePacker(MOUNT_DIR, IMAGE_TYPE, PACK_VARIANT, OUT_DIR, OUT_SYSTEM_IMG, APT_SERVER_CONFIG, TEMP_DIR, DEB_OUT_DIR, DEBIAN_INSTALL_DIR, IS_CLEANUP_ENABLED)
 
         packer.build_image()
