@@ -13,7 +13,10 @@ from helpers import check_if_root, logger, run_command, check_and_append_line_in
 from deb_organize import search_manifest_map_for_path
 
 class PackageBuilder:
-    def __init__(self, MOUNT_DIR, SOURCE_DIR, APT_SERVER_CONFIG, CHROOT_NAME, MANIFEST_MAP=None, TEMP_DIR=None, DEB_OUT_DIR=None, DEB_OUT_DIR_APT=None, DEBIAN_INSTALL_DIR=None, DEBIAN_INSTALL_DIR_APT=None, IS_CLEANUP_ENABLED=True):
+    def __init__(self, MOUNT_DIR, SOURCE_DIR, APT_SERVER_CONFIG, CHROOT_NAME, \
+    MANIFEST_MAP=None, TEMP_DIR=None, DEB_OUT_DIR=None, DEB_OUT_DIR_APT=None, DEBIAN_INSTALL_DIR=None, \
+    DEBIAN_INSTALL_DIR_APT=None, IS_CLEANUP_ENABLED=True, IS_PREPARE_SOURCE=False):
+
         if not check_if_root():
             logger.error('Please run this script as root user.')
             exit(1)
@@ -37,6 +40,7 @@ class PackageBuilder:
         self.DEBIAN_INSTALL_DIR = DEBIAN_INSTALL_DIR
         self.DEB_OUT_DIR_APT = DEB_OUT_DIR_APT
         self.DEBIAN_INSTALL_DIR_APT = DEBIAN_INSTALL_DIR_APT
+        self.IS_PREPARE_SOURCE = IS_PREPARE_SOURCE
 
         self.generate_schroot_config()
 
@@ -200,8 +204,13 @@ class PackageBuilder:
 
         os.chdir(repo_path)
         create_new_directory(self.TEMP_DIR)
+        if self.IS_PREPARE_SOURCE:
+            logger.info(f"generating dsc for {packages}...")
+            cmd = f"sbuild --source --no-arch-all --no-arch-any  -d {self.DIST}-arm64{self.CHROOT_NAME} --build-dir {self.TEMP_DIR} "
 
-        cmd = f"sbuild -A --arch=arm64 -d {self.DIST}-arm64{self.CHROOT_NAME} --no-run-lintian --build-dir {self.TEMP_DIR} --build-dep-resolver=apt"
+        else:
+            cmd = f"sbuild -A --arch=arm64 -d {self.DIST}-arm64{self.CHROOT_NAME} --no-run-lintian \
+            --build-dir {self.TEMP_DIR} --build-dep-resolver=apt"
 
         if self.DEB_OUT_DIR_APT:
             build_deb_package_gz(self.DEB_OUT_DIR, start_server=False) # Rebuild Packages file
@@ -217,7 +226,7 @@ class PackageBuilder:
 
         run_command(cmd, cwd=repo_path)
 
-        # self.reorganize_dsc_in_oss_prop(repo_path)
+        self.reorganize_dsc_in_oss_prop(repo_path)
         self.reorganize_deb_in_oss_prop(repo_path)
 
         logger.info(f"{packages} built successfully!")

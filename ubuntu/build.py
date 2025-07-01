@@ -44,6 +44,8 @@ def parse_arguments():
                         help='Package to build')
     parser.add_argument("--nocleanup", action="store_true",
                         help="Cleanup workspace after build", default=False)
+    parser.add_argument("--prepare-sources", action="store_true",
+                        help="Prepares sources, does not build", default=False)
 
     # Deprecated
     parser.add_argument('--skip-starter-image', action='store_true', default=False,
@@ -84,6 +86,7 @@ IF_BUILD_KERNEL = args.build_kernel
 IF_GEN_DEBIANS = args.gen_debians
 IF_PACK_IMAGE = args.pack_image
 IS_CLEANUP_ENABLED = not args.nocleanup
+IS_PREPARE_SOURCE = args.prepare_sources
 
 PACK_VARIANT = args.pack_variant
 
@@ -135,7 +138,7 @@ if IF_BUILD_KERNEL:
 if ERROR_EXIT_BUILD:
     exit(1)
 
-if IF_GEN_DEBIANS:
+if IF_GEN_DEBIANS or IS_PREPARE_SOURCE :
     builder = None
 
     try:
@@ -147,7 +150,7 @@ if IF_GEN_DEBIANS:
         if DEBIAN_INSTALL_DIR and os.path.exists(DEBIAN_INSTALL_DIR):
             DEBIAN_INSTALL_DIR_APT = build_deb_package_gz(DEBIAN_INSTALL_DIR, start_server=True)
 
-        builder = PackageBuilder(MOUNT_DIR, SOURCES_DIR, APT_SERVER_CONFIG, CHROOT_NAME, MANIFEST_MAP, TEMP_DIR, DEB_OUT_DIR, DEB_OUT_DIR_APT, DEBIAN_INSTALL_DIR, DEBIAN_INSTALL_DIR_APT, IS_CLEANUP_ENABLED)
+        builder = PackageBuilder(MOUNT_DIR, SOURCES_DIR, APT_SERVER_CONFIG, CHROOT_NAME, MANIFEST_MAP, TEMP_DIR, DEB_OUT_DIR, DEB_OUT_DIR_APT, DEBIAN_INSTALL_DIR, DEBIAN_INSTALL_DIR_APT, IS_CLEANUP_ENABLED, IS_PREPARE_SOURCE)
         builder.load_packages()
         if BUILD_PACKAGE_NAME:
             # TODO: Check if package is available
