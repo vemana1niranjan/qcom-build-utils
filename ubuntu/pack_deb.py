@@ -128,6 +128,7 @@ noble \
                     bash_command += f" \"{config.strip()}\""
 
         bash_command += f" \"deb [arch=arm64 trusted=yes] http://ports.ubuntu.com/ubuntu-ports noble main universe multiverse restricted\""
+        bash_command += f" \"deb [arch=arm64 trusted=yes] http://ports.ubuntu.com/ubuntu-ports noble-updates main universe multiverse restricted\""
 
         out = run_command_for_result(bash_command)
         if out['returncode'] != 0:
