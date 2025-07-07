@@ -110,6 +110,7 @@ sudo mmdebstrap --verbose --logfile={log_file} \
 --customize-hook='echo "PermitRootLogin yes" > "$1/etc/ssh/sshd_config"' \
 --setup-hook='echo /dev/disk/by-partlabel/system / ext4 defaults 0 1 > "$1/etc/fstab"' \
 --arch=arm64 \
+--aptopt='APT::Get::Allow-Downgrades "true";' \
 --include={self.get_deb_list()} \
 noble \
 {self.MOUNT_DIR}"""
