@@ -107,7 +107,7 @@ GRUB_DISABLE_RECOVERY="true"' >> {os.path.join(self.MOUNT_DIR, 'etc', 'default',
         bash_command = f"""
 sudo mmdebstrap --verbose --logfile={log_file} \
 --customize-hook='echo root:password | chroot "$1" chpasswd' \
---customize-hook='echo "PermitRootLogin yes" > "$1/etc/ssh/sshd_config"' \
+--customize-hook='echo "PermitRootLogin yes" >> "$1/etc/ssh/sshd_config"' \
 --setup-hook='echo /dev/disk/by-partlabel/system / ext4 defaults 0 1 > "$1/etc/fstab"' \
 --arch=arm64 \
 --aptopt='APT::Get::Allow-Downgrades "true";' \
@@ -129,7 +129,6 @@ noble \
                     bash_command += f" \"{config.strip()}\""
 
         bash_command += f" \"deb [arch=arm64 trusted=yes] http://ports.ubuntu.com/ubuntu-ports noble main universe multiverse restricted\""
-        bash_command += f" \"deb [arch=arm64 trusted=yes] http://ports.ubuntu.com/ubuntu-ports noble-updates main universe multiverse restricted\""
 
         out = run_command_for_result(bash_command)
         if out['returncode'] != 0:
