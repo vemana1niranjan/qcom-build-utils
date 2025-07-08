@@ -1445,6 +1445,7 @@ vim-runtime	2:9.1.0016-1ubuntu7.8
 vim-tiny	2:9.1.0016-1ubuntu7.8
 wamerican	2020.12.07-2
 webp-pixbuf-loader	0.2.4-2build2
+weston
 wget	1.21.4-1ubuntu4.1
 whiptail	0.52.24-2ubuntu2
 whoopsie	0.2.77build3

@@ -679,6 +679,7 @@ vim	2:9.1.0016-1ubuntu7.8
 vim-common	2:9.1.0016-1ubuntu7.8
 vim-runtime	2:9.1.0016-1ubuntu7.8
 vim-tiny	2:9.1.0016-1ubuntu7.8
+weston
 wget	1.21.4-1ubuntu4.1
 whiptail	0.52.24-2ubuntu2
 wireless-regdb	2024.10.07-0ubuntu2~24.04.1
