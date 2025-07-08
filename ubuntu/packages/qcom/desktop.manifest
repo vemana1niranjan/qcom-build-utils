@@ -7,3 +7,14 @@ qcom-fastcv-binaries1	1.8.0
 qcom-dspservices-headers-dev	1.0.1
 qcom-fastrpc1	1.0.0-6
 qcom-securedsp-example-dev	1.0.1
+qcom-diag	1.0.1
+qcom-diag-headers	1.0.1
+qcom-diag-router	1.0.1
+qcom-libdiag	1.0.1
+qcom-libdiag-dev	1.0.1
+qcom-libqmi-framework	1.0.0
+qcom-libqmi-framework-dev	1.0.0
+qcom-qmi-framework-utils	1.0.0
+qcom-time-genoff	1.0.1
+qcom-time-genoff-dev	1.0.1
+qcom-time-services	1.0.1
