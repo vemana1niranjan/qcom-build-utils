@@ -44,16 +44,10 @@ class PackageBuilder:
 
         self.generate_schroot_config()
 
-
     def generate_schroot_config(self):
         logger.info(f"Generating schroot configuration for {self.CHROOT_NAME} at {self.MOUNT_DIR}")
-        chroot_root = Path(self.MOUNT_DIR)
-
         if not os.path.exists(os.path.join(self.MOUNT_DIR, "root")):
-            out = run_command_for_result(
-                f"sbuild-createchroot --arch=arm64 --chroot-suffix={self.CHROOT_NAME} "
-                f"--components=main,universe {self.DIST} {self.MOUNT_DIR} http://ports.ubuntu.com"
-            )
+            out = run_command_for_result(f"sbuild-createchroot --arch=arm64 --chroot-suffix={self.CHROOT_NAME} --components=main,universe {self.DIST} {self.MOUNT_DIR} http://ports.ubuntu.com")
             if out['returncode'] != 0:
                 if self.IS_CLEANUP_ENABLED:
                     cleanup_directory(self.MOUNT_DIR)
@@ -62,29 +56,6 @@ class PackageBuilder:
                 logger.info(f"Schroot environment {self.CHROOT_NAME} created successfully.")
         else:
             logger.warning(f"Schroot environment {self.CHROOT_NAME} already exists at {self.MOUNT_DIR}. Skipping creation.")
-
-        # Update sources.list
-        sources_list_path = chroot_root / "etc/apt/sources.list"
-        try:
-            sources_list_path.parent.mkdir(parents=True, exist_ok=True)
-            sources_list_path.write_text(
-                f"""deb http://ports.ubuntu.com/ {self.DIST} main universe
-    deb http://ports.ubuntu.com/ {self.DIST}-updates main universe
-    """
-            )
-            logger.info(f"Updated sources.list at {sources_list_path}")
-        except Exception as e:
-            logger.error(f"Failed to write sources.list: {e}")
-            raise
-
-        # Run apt update inside the chroot
-        try:
-            logger.info(f"Running apt update inside chroot at {chroot_root}")
-            run_command(f"sudo chroot {str(chroot_root)} apt update")
-            logger.info("apt update completed successfully inside chroot.")
-        except Exception as e:
-            logger.error(f"Failed to run apt update inside chroot: {e}")
-            raise
 
     def load_packages(self):
         """Load package metadata from build_config.py and fetch dependencies from control files."""
