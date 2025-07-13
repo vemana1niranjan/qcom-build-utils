@@ -25,3 +25,8 @@ qcom-sensors-services	1.0.0
 qcom-sensors-test-utils	1.0.0
 qcom-sensors-test-core	1.0.0
 qcom-sensors-test-apps	1.0.0
+qcom-minkipc	1.0.0
+qcom-securemsm	1.0.0
+qcom-securemsm-features	1.0.0
+qcom-securemsm-features-utils	1.0.0
+qcom-securemsm-utils	1.0.0
