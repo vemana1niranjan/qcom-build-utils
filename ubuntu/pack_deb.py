@@ -21,7 +21,7 @@ from helpers import create_new_file, check_if_root, logger, run_command, create_
 from deb_organize import search_manifest_map_for_path
 
 class PackagePacker:
-    def __init__(self, MOUNT_DIR, IMAGE_TYPE, VARIANT, OUT_DIR, OUT_SYSTEM_IMG, APT_SERVER_CONFIG, TEMP_DIR, DEB_OUT_DIR, DEBIAN_INSTALL_DIR, IS_CLEANUP_ENABLED):
+    def __init__(self, MOUNT_DIR, IMAGE_TYPE, VARIANT, OUT_DIR, OUT_SYSTEM_IMG, APT_SERVER_CONFIG, TEMP_DIR, DEB_OUT_DIR, DEBIAN_INSTALL_DIR, IS_CLEANUP_ENABLED, PACKAGES_MANIFEST_PATH=None):
         """
         Initializes the PackagePacker instance.
 
@@ -38,6 +38,7 @@ class PackagePacker:
         - DEBIAN_INSTALL_DIR (str): Directory for Debian installation files.
         - IS_CLEANUP_ENABLED (bool): Flag to enable cleanup of temporary files.
         """
+
         if not check_if_root():
             logger.error('Please run this script as root user.')
             exit(1)
@@ -53,7 +54,8 @@ class PackagePacker:
         self.OUT_DIR = OUT_DIR
         self.TEMP_DIR = TEMP_DIR
         self.OUT_SYSTEM_IMG = OUT_SYSTEM_IMG
-        
+        self.PACKAGES_MANIFEST_PATH = PACKAGES_MANIFEST_PATH
+
         self.EFI_BIN_PATH = os.path.join(self.OUT_DIR, "efi.bin")
         self.EFI_MOUNT_PATH = os.path.join(self.MOUNT_DIR, "boot", "efi")
 
@@ -105,33 +107,56 @@ GRUB_DISABLE_RECOVERY="true"' >> {os.path.join(self.MOUNT_DIR, 'etc', 'default',
         """
         Parses the base and QCOM manifests to gather the list of packages to include in the image.
         """
-        self.BASE_MANIFEST = create_new_file(os.path.join(self.cur_file, "packages", "base", f"{self.IMAGE_TYPE}.manifest"))
-        self.QCOM_MANIFEST = create_new_file(os.path.join(self.cur_file, "packages", "qcom", f"{self.IMAGE_TYPE}.manifest"))
-
-        with open(self.BASE_MANIFEST, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#'):
-                    parts = list(line.strip().split('\t'))
-                    self.DEBS.append(
-                        {
-                            'package': parts[0],
-                            'version': parts[1] if len(parts) > 1 else None,
-                        }
-                    )
-
-        if self.VARIANT == "qcom":
-            with open(self.QCOM_MANIFEST, 'r') as f:
+        self.QCOM_MANIFEST = None
+        # 1. User-provided manifest
+        if self.PACKAGES_MANIFEST_PATH:
+            user_manifest = Path(self.PACKAGES_MANIFEST_PATH)
+            if not user_manifest.is_file() or not user_manifest.name.endswith('.manifest'):
+                raise ValueError(f"Provided manifest path '{user_manifest}' is not a valid '.manifest' file.")
+            self.BASE_MANIFEST = str(user_manifest)
+            logger.info(f"Packages manifest path: {self.BASE_MANIFEST}")
+            # Load packages from user manifest
+            with open(self.BASE_MANIFEST, 'r') as f:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith('#'):
-                        parts = list(line.strip().split('\t'))
-                        self.DEBS.append(
-                            {
-                                'package': parts[0],
-                                'version': parts[1] if len(parts) > 1 else None,
-                            }
-                        )
+                        parts = list(line.split('\t'))
+                        self.DEBS.append({
+                            'package': parts[0],
+                            'version': parts[1] if len(parts) > 1 else None,
+                        })
+            return  # Done if user manifest is found and valid
+        # 2. Default manifest(s) from packages/base and/or packages/qcom
+        base_path = os.path.join(self.cur_file, "packages", "base", f"{self.IMAGE_TYPE}.manifest")
+        if os.path.isfile(base_path):
+            self.BASE_MANIFEST = base_path
+            with open(self.BASE_MANIFEST, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        parts = list(line.split('\t'))
+                        self.DEBS.append({
+                            'package': parts[0],
+                            'version': parts[1] if len(parts) > 1 else None,
+                        })
+            # Also include qcom manifest if variant == qcom
+            if self.VARIANT == "qcom":
+                qcom_path = os.path.join(self.cur_file, "packages", "qcom", f"{self.IMAGE_TYPE}.manifest")
+                if os.path.isfile(qcom_path):
+                    self.QCOM_MANIFEST = qcom_path
+                    with open(self.QCOM_MANIFEST, 'r') as f:
+                        for line in f:
+                            line = line.strip()
+                            if line and not line.startswith('#'):
+                                parts = list(line.split('\t'))
+                                self.DEBS.append({
+                                    'package': parts[0],
+                                    'version': parts[1] if len(parts) > 1 else None,
+                                })
+            return
+        # 3. No manifest found: print message and exit
+        logger.error("No manifest found. Please provide a valid .manifest file via PACKAGES_MANIFEST_PATH or ensure default manifests exist.")
+        exit(1)
 
     def get_deb_list(self) -> None:
         """
