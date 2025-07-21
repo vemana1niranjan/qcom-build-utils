@@ -1,3 +1,7 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+#
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
 import os
 
 LINUX_MODULES_DEB = "linux-modules-*-qcom/linux-modules-*_arm64.deb"
