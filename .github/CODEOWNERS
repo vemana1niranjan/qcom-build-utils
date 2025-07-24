@@ -1,6 +1,6 @@
 # Default reviewers for all changes in entire repository,
 # unless a later match takes precedence
-* @sjakki88 @vishwasudupa
+* @sjakki88 @vishwasudupa @bjordiscollaku
 
 # Specific ownership for the ubuntu folder
 ubuntu/* @vkraleti @sbanerjee-quic @vishwasudupa @bjordiscollaku
