@@ -17,4 +17,4 @@ for more information, please refer to the README in each subdirectory.
 
 License
 -------
-qcom-build-utils is licensed under the BSD-3-clause-clear License. See LICENSE for the full license text.
+qcom-build-utils is licensed under the [BSD-3-clause-clear License](https://spdx.org/licenses/BSD-3-Clause-Clear.html). See [LICENSE](LICENSE.txt) for the full license text.
