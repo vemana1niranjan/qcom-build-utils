@@ -49,6 +49,7 @@ jobs:
       - name: Checkout Repository And Submodules Recursively
         uses: actions/checkout@v4 # Using public GitHub action to checkout repo, see https://github.com/actions/checkout
         with:
+          ref: ${{ github.head_ref }}
           clean: true # Make sure the workspace is cleaned up from previous runs
           submodules: 'recursive' # Make sure all submodules are recursively checked out
           ssh-key: ${{ secrets.ACTIONS_SSH_KEY }} # Add SSH key for cloning private repos
