@@ -101,10 +101,6 @@ def parse_arguments():
                         help="Cleanup workspace after build", default=False)
     parser.add_argument("--prepare-sources", action="store_true",
                         help="Prepares sources, does not build", default=False)
-    parser.add_argument("--no-abi-check", action="store_true",
-                        help="Skip ABI compatibility check", default=False)
-    parser.add_argument("--force-abi-check", action="store_true",
-                        help="Skip ABI compatibility check", default=False)
 
     # Deprecated
     parser.add_argument('--chroot-name', type=str, required=False,
@@ -180,8 +176,6 @@ IS_PREPARE_SOURCE = args.prepare_sources
 PACK_VARIANT = args.pack_variant
 
 TARGET_HW = args.flat_meta
-NO_ABI_CHECK = args.no_abi_check
-FORCE_ABI_CHECK = args.force_abi_check
 
 # Define kernel and output directories
 KERNEL_DIR = args.kernel_src_dir
@@ -282,44 +276,6 @@ if IF_GEN_DEBIANS or IS_PREPARE_SOURCE :
     finally:
         if error_during_packages_build:
             logger.critical("Debian package generation error. Exiting.")
-            exit(1)
-
-
-if NO_ABI_CHECK:
-    logger.warning("ABI check is explicitely disabled. Skipping ABI check.")
-elif (not IF_GEN_DEBIANS and not IS_PREPARE_SOURCE) and not FORCE_ABI_CHECK:
-    logger.debug("Skipping ABI check since no debian packages generated")
-else:
-    if FORCE_ABI_CHECK and (not IF_GEN_DEBIANS and not IS_PREPARE_SOURCE):
-        logger.info("Forcing ABI check even if no debian package were built")
-
-    error_during_abi_check = False
-
-    logger.info("Running the ABI checking phase")
-
-    try:
-        if not APT_SERVER_CONFIG:
-            raise Exception("No apt server config provided")
-
-        if len(APT_SERVER_CONFIG) > 1:
-            logger.warning("Multiple apt server configs are not supported yet, picking the first one in the list")
-
-        logger.debug("Running the package ABI checker over the temp folder containing all the repo outputs")
-        check_passed = multiple_repo_deb_abi_checker(DEB_OUT_TEMP_DIR, APT_SERVER_CONFIG[0])
-
-        if check_passed:
-            logger.info("ABI check passed.")
-        else:
-            logger.critical("ABI check failed.")
-
-    except Exception as e:
-        logger.critical(f"Exception during the ABI checking : {e}")
-        traceback.print_exc()
-        error_during_abi_check = True
-
-    finally:
-        if error_during_abi_check:
-            logger.critical("ABI check failed. Exiting.")
             exit(1)
 
 # Pack the image if specified

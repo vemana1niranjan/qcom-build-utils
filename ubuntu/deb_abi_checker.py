@@ -33,13 +33,10 @@ Options:
 import os
 import sys
 import subprocess
-import tempfile
 import shutil
 import argparse
 import glob
 import re
-import urllib.request
-import urllib.parse
 import traceback
 from helpers import create_new_directory
 from color_logger import logger
@@ -155,7 +152,7 @@ def main():
 
     sys.exit(ret)
 
-def multiple_repo_deb_abi_checker(package_dir, apt_server_config, keep_temp=True, specific_apt_version=None) -> bool:
+def multiple_repo_deb_abi_checker(package_dir, apt_server_config, keep_temp=True, specific_apt_version=None) -> int:
     """
     Runs the ABI check in a folder containing multiple package folders.
 
@@ -181,33 +178,28 @@ def multiple_repo_deb_abi_checker(package_dir, apt_server_config, keep_temp=True
 
     Returns:
     --------
-        - bool: True if the package ABI diff was performed sucessfully, False otherwise.
-            Note that this does not mean that the ABI diff passed, only that it was performed successfully.
+        - bool: Aglomeration of bitwise return value of every repo
     """
 
-    all_repos_successful = True
+    final_ret = 0
 
     for folder in os.listdir(package_dir):
         folder_path = os.path.join(package_dir, folder)
         if os.path.isdir(folder_path):
 
             try:
-                success = single_repo_deb_abi_checker(folder_path, apt_server_config, keep_temp, specific_apt_version)
+                final_ret |= single_repo_deb_abi_checker(folder_path, apt_server_config, keep_temp, specific_apt_version)
             except Exception as e:
                 logger.critical(f"Function single_repo_deb_abi_checker threw an exception: {e}")
-                success = False
 
                 traceback.print_exc()
-
-            finally:
-                if not success:
-                    all_repos_successful = False
-
+                sys.exit(-1)
+                
     log_file = os.path.join(package_dir, "abi_checker.log")
 
     print_results(log_file)
 
-    return all_repos_successful
+    return final_ret
 
 def single_repo_deb_abi_checker(repo_package_dir, apt_server_config, keep_temp=True, specific_apt_version=None, print_debug_tree=False) -> int:
     """

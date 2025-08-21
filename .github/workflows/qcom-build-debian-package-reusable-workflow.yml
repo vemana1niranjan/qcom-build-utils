@@ -102,7 +102,7 @@ jobs:
         run: ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/prep_chroot_env.py --arch arm64 --os-codename noble --suffix ubuntu
 
       - name: Build Debian Package
-        run: ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/build.py --workspace ./WORKSPACE --gen-debians --no-abi-check
+        run: ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/build.py --workspace ./WORKSPACE --gen-debians
 
       - name: ABI Check
         run: |
