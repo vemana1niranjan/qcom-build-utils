@@ -543,7 +543,18 @@ def single_package_abi_checker(repo_package_dir,
         if bit3:
             result.abi_pkg_diff_result = "COMPATIBLE-DIFF"
             logger.warning(f"[ABI_CHECKER]: abipkgdiff detected ABI changes")
+
             return_value = RETURN_ABI_COMPATIBLE_DIFF
+
+            match = re.search(r"Functions changes summary:\s+(\d+)\s+Removed,\s+(\d+)\s+Changed,", result.abi_pkg_diff_output)
+            if match:
+                changed_count = int(match.group(2))
+                if changed_count > 0:
+                    abidiff_result |= 0b1000
+                    return_value = RETURN_ABI_INCOMPATIBLE_DIFF
+                    result.abi_pkg_diff_result = "INCOMPATIBLE-DIFF"
+                    logger.warning(f"[ABI_CHECKER]: Overriding to INCOMPATIBLE CHANGE since there are changed functions")
+
         if bit4:
             # if bit 4 is set, bit 3 must be too, so this fallthrough is ok
             result.abi_pkg_diff_result = "INCOMPATIBLE-DIFF"
@@ -557,6 +568,8 @@ def single_package_abi_checker(repo_package_dir,
                 with open(file_path, 'r') as file:
                     logger.debug(f"Content of {filename}:")
                     logger.warning(file.read())
+
+        
     else:
         result.abi_pkg_diff_result = "NO-DIFF"
         logger.info(f"[ABI_CHECKER]/{package_name}: abipkgdiff did not find any differences between old and new packages")

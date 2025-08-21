@@ -200,12 +200,13 @@ jobs:
           echo "Content of result file :"
           cat ./results.txt          
 
-          if grep -qE '^- Version.*FAIL' ./results.txt; then
+          if grep -qE '^\s*-\s*Version:\s*.*FAIL' ./results.txt; then
             echo "❌ Test failed: At least one FAIL found in - Version: line"
             exit 1
           else
             echo "✅ Test passed: All versions are PASS"
           fi
+
 
       - name: Upload Debian Packages To PPA Server If First Build
         if: ${{ env.INITIAL_UPLOAD_TO_PPA == 'true' }}
