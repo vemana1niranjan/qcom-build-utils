@@ -32,7 +32,7 @@ from build_dtb import build_dtb
 from build_deb import PackageBuilder, PackageNotFoundError, PackageBuildError
 from constants import *
 from datetime import date
-from helpers import create_new_directory, umount_dir, check_if_root, check_and_append_line_in_file, cleanup_file, cleanup_directory, change_folder_perm_read_write, print_build_logs, start_local_apt_server, build_deb_package_gz, pull_debs_wget
+from helpers import create_new_directory, umount_dir, check_if_root, check_and_append_line_in_file, cleanup_file, cleanup_directory, print_build_logs, start_local_apt_server, build_deb_package_gz, pull_debs_wget
 from deb_organize import generate_manifest_map
 from pack_deb import PackagePacker
 from flat_meta import create_flat_meta
@@ -390,23 +390,6 @@ if IF_FLAT_META:
     except Exception as e:
         logger.error(e)
         ERROR_EXIT_BUILD = True
-
-# Change permissions for output directories if cleanup is enabled
-if IS_CLEANUP_ENABLED:
-    error_during_cleanup = False
-
-    try:
-        change_folder_perm_read_write(OSS_DEB_OUT_DIR)
-        change_folder_perm_read_write(PROP_DEB_OUT_DIR)
-        change_folder_perm_read_write(DEB_OUT_DIR)
-        change_folder_perm_read_write(OUT_DIR)
-    except Exception:
-        error_during_cleanup = True
-
-    finally:
-        if error_during_cleanup:
-            logger.critical("Cleanup failed. Exiting.")
-            exit(1)
 
 logger.info("Script execution sucessful")
 exit(0)

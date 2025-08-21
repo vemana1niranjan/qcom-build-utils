@@ -301,60 +301,6 @@ def umount_dir(MOUNT_DIR, UMOUNT_HOST_FS=False):
     if result.returncode != 0 and result.returncode != 32:
         logger.error(f"Failed to unmount {MOUNT_DIR}: {result.stderr}")
 
-def change_folder_perm_read_write(DIR):
-    """
-    Changes permissions of a directory and its contents to allow read and write access.
-
-    Args:
-    -----
-    - DIR (str): The path to the directory whose permissions are to be changed.
-
-    Raises:
-    -------
-    - Exception: If an error occurs while changing permissions.
-    """
-    try:
-        # Change permissions for the root folder itself
-        current_permissions = os.stat(DIR).st_mode
-        new_permissions = current_permissions
-
-        if current_permissions & stat.S_IWUSR:
-            new_permissions |= stat.S_IWOTH
-
-        if current_permissions & stat.S_IXUSR:
-            new_permissions |= stat.S_IXOTH
-
-        os.chmod(DIR, new_permissions)
-
-        for root, dirs, files in os.walk(DIR):
-            for dir_ in dirs:
-                dir_path = os.path.join(root, dir_)
-                current_permissions = os.stat(dir_path).st_mode
-                new_permissions = current_permissions
-
-                if current_permissions & stat.S_IWUSR:
-                    new_permissions |= stat.S_IWOTH
-                if current_permissions & stat.S_IXUSR:
-                    new_permissions |= stat.S_IXOTH
-
-                os.chmod(dir_path, new_permissions)
-
-            for file in files:
-                file_path = os.path.join(root, file)
-                current_permissions = os.stat(file_path).st_mode
-                new_permissions = current_permissions
-
-                if current_permissions & stat.S_IWUSR:
-                    new_permissions |= stat.S_IWOTH
-                if current_permissions & stat.S_IXUSR:
-                    new_permissions |= stat.S_IXOTH
-
-                os.chmod(file_path, new_permissions)
-
-        logger.info(f"Permissions updated conditionally for all folders and files in {DIR}.")
-    except Exception as e:
-        logger.error(f"Error while changing permissions: {e}")
-
 def print_build_logs(directory):
     """
     Prints the contents of build log files in a specified directory.
