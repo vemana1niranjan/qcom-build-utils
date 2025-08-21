@@ -32,17 +32,12 @@ from build_dtb import build_dtb
 from build_deb import PackageBuilder, PackageNotFoundError, PackageBuildError
 from constants import *
 from datetime import date
-from helpers import create_new_directory, umount_dir, check_if_root, check_and_append_line_in_file, cleanup_file, cleanup_directory, print_build_logs, start_local_apt_server, build_deb_package_gz, pull_debs_wget
+from helpers import create_new_directory, umount_dir,  check_and_append_line_in_file, cleanup_file, cleanup_directory, print_build_logs, start_local_apt_server, build_deb_package_gz, pull_debs_wget
 from deb_organize import generate_manifest_map
 from pack_deb import PackagePacker
 from flat_meta import create_flat_meta
 from deb_abi_checker import multiple_repo_deb_abi_checker
 from color_logger import logger
-
-# Check for root privileges
-if not check_if_root():
-    logger.critical('Please run this script as root user.')
-    #exit(1)
 
 DIST           = "noble"
 ARCH           = "arm64"

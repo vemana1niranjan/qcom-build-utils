@@ -24,16 +24,6 @@ from apt_server import AptServer
 from constants import TERMINAL, HOST_FS_MOUNT
 from color_logger import logger
 
-def check_if_root() -> bool:
-    """
-    Checks if the script is being run with root privileges.
-
-    Returns:
-    --------
-    - bool: True if the script is run as root, False otherwise.
-    """
-    return os.geteuid() == 0
-
 def check_and_append_line_in_file(file_path, line_to_check, append_if_missing=False):
     """
     Checks if a specific line exists in a file and appends it if it is missing.
