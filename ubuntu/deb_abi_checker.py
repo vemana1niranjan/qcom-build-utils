@@ -512,6 +512,8 @@ def single_package_abi_checker(repo_package_dir,
                                              new_deb_path, new_dev_path, new_ddeb_path,
                                              report_dir, include_non_reachable_types=True)
 
+    return_value = 0
+
     # The return value between abidiff and abipkgdiff has the same meaning, so we can use the same analysis
     if abidiff_result != 0:
 
@@ -539,10 +541,12 @@ def single_package_abi_checker(repo_package_dir,
         if bit3:
             result.abi_pkg_diff_result = "COMPATIBLE-DIFF"
             logger.warning(f"[ABI_CHECKER]: abipkgdiff detected ABI changes")
+            return_value = RETURN_ABI_COMPATIBLE_DIFF
         if bit4:
             # if bit 4 is set, bit 3 must be too, so this fallthrough is ok
             result.abi_pkg_diff_result = "INCOMPATIBLE-DIFF"
             logger.warning(f"[ABI_CHECKER]: abipkgdiff detected ABI ***INCOMPATIBLE*** changes.")
+            return_value = RETURN_ABI_INCOMPATIBLE_DIFF
 
         # Print the content of all the files in 'report_dir'
         for filename in os.listdir(report_dir):
@@ -552,11 +556,9 @@ def single_package_abi_checker(repo_package_dir,
                     logger.debug(f"Content of {filename}:")
                     logger.warning(file.read())
     else:
-        # No ABI DIFF
         result.abi_pkg_diff_result = "NO-DIFF"
-
         logger.info(f"[ABI_CHECKER]/{package_name}: abipkgdiff did not find any differences between old and new packages")
-
+        return_value = RETURN_ABI_NO_DIFF
 
     msg = "[ABI_CHECKER]/{package_name}: Although, no {pkg} was found for the {version} package, interpret the results with caution"
 
@@ -582,7 +584,9 @@ def single_package_abi_checker(repo_package_dir,
         logger.debug(f"[ABI_CHECKER]: Removing temporary directory {abi_check_temp_dir}")
         shutil.rmtree(abi_check_temp_dir)
 
-    return analyze_abi_diff_result(old_version, new_version, abidiff_result)
+    analyze_abi_diff_result(old_version, new_version, abidiff_result)
+    
+    return return_value
 
 def extract_deb(deb_path, dev_path, ddeb_path, extract_dir):
     """Extract the content of a .deb package and its .ddeb to a specified directory."""

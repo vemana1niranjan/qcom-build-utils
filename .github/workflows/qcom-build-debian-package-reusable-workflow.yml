@@ -29,12 +29,12 @@ env:
   # version of the package in the PPA
   INITIAL_UPLOAD_TO_PPA: false
 jobs:
-  qcom-build-debian-package:
+  build-debian-package-reusable-workflow:
     runs-on: [self-hosted, Linux, ARM64]
 
     steps:
       - name: Clear PPA if requested
-        if: ${{ inputs.clear_ppa == 'true' }}
+        if: ${{ inputs.clear_ppa == true }}
         run: |
           rm -rf ${{ env.PPA_HTTP_DIRECTORY }}/*
           echo "Directory ${{ env.PPA_HTTP_DIRECTORY }} removed"
@@ -120,7 +120,7 @@ jobs:
           # Bit 4 (16): RETURN_PPA_ERROR
 
           if (( RET == 0 )); then
-            echo "ABI check passed"
+            echo "ABI check returned NO_DIFF"
           fi
 
           if (( RET & 1 )); then
