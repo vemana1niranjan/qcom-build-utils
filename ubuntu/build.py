@@ -43,7 +43,6 @@ DIST           = "noble"
 ARCH           = "arm64"
 CHROOT_SUFFIX  = "ubuntu"
 CHROOT_NAME    = DIST + "-" + ARCH + "-" + CHROOT_SUFFIX
-CHROOT_DIR     = "/srv/chroot"
 
 
 def parse_arguments():
@@ -259,7 +258,7 @@ if IF_GEN_DEBIANS or IS_PREPARE_SOURCE :
             DEBIAN_INSTALL_DIR_APT = build_deb_package_gz(DEBIAN_INSTALL_DIR, start_server=True)
 
         # Initialize the PackageBuilder to load packages
-        builder = PackageBuilder(CHROOT_NAME, CHROOT_DIR, SOURCES_DIR, APT_SERVER_CONFIG, MANIFEST_MAP, DEB_OUT_TEMP_DIR, DEB_OUT_DIR, DEB_OUT_DIR_APT, DEBIAN_INSTALL_DIR_APT, IS_CLEANUP_ENABLED, IS_PREPARE_SOURCE)
+        builder = PackageBuilder(CHROOT_NAME, SOURCES_DIR, APT_SERVER_CONFIG, MANIFEST_MAP, DEB_OUT_TEMP_DIR, DEB_OUT_DIR, DEB_OUT_DIR_APT, DEBIAN_INSTALL_DIR_APT, IS_CLEANUP_ENABLED, IS_PREPARE_SOURCE)
         builder.load_packages()
 
         # Build a specific package if provided, otherwise build all packages

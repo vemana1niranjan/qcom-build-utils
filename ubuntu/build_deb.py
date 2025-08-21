@@ -19,7 +19,7 @@ from pathlib import Path
 from queue import Queue
 from collections import defaultdict, deque
 from constants import *
-from helpers import check_if_root, run_command, check_and_append_line_in_file, create_new_directory, build_deb_package_gz, run_command_for_result, print_build_logs
+from helpers import run_command, check_and_append_line_in_file, create_new_directory, build_deb_package_gz, run_command_for_result, print_build_logs
 from deb_organize import search_manifest_map_for_path
 from color_logger import logger
 
@@ -36,16 +36,15 @@ class PackageBuildError(Exception):
     pass
 
 class PackageBuilder:
-    def __init__(self, CHROOT_NAME, CHROOT_DIR, SOURCE_DIR, APT_SERVER_CONFIG, \
+    def __init__(self, CHROOT_NAME, SOURCE_DIR, APT_SERVER_CONFIG, \
     MANIFEST_MAP=None, DEB_OUT_TEMP_DIR=None, DEB_OUT_DIR=None, DEB_OUT_DIR_APT=None, \
-    DEBIAN_INSTALL_DIR_APT=None, IS_CLEANUP_ENABLED=True, IS_PREPARE_SOURCE=False, DIST= "noble", ARCH="arm64", CHROOT_SUFFIX="ubuntu"):
+    DEBIAN_INSTALL_DIR_APT=None, IS_CLEANUP_ENABLED=True, IS_PREPARE_SOURCE=False):
         """
         Initializes the PackageBuilder instance.
 
         Args:
         -----
         - CHROOT_NAME (str): The name of the chroot environment.
-        - CHROOT_DIR (str): The directory where the chroot environment is found, or created if it doesnt already exist.
         - SOURCE_DIR (str): The source directory containing the packages to build.
         - APT_SERVER_CONFIG (list): Configuration for the APT server.
         - MANIFEST_MAP (dict, optional): A mapping of package paths to their properties.
@@ -57,14 +56,9 @@ class PackageBuilder:
         - IS_PREPARE_SOURCE (bool, optional): If True, prepares the source directory before building. Defaults to False.
         """
         self.CHROOT_NAME = CHROOT_NAME
-        self.CHROOT_DIR  = CHROOT_DIR
-        self.DIST = DIST
-        self.ARCH = ARCH
-        self.CHROOT_SUFFIX = CHROOT_SUFFIX
         self.SOURCE_DIR = SOURCE_DIR
         self.DEB_OUT_DIR = DEB_OUT_DIR
         self.APT_SERVER_CONFIG = APT_SERVER_CONFIG
-        self.CHROOT_NAME = CHROOT_NAME
         self.MANIFEST_MAP = MANIFEST_MAP
         self.DEB_OUT_TEMP_DIR = DEB_OUT_TEMP_DIR
         self.IS_CLEANUP_ENABLED = IS_CLEANUP_ENABLED
@@ -72,50 +66,8 @@ class PackageBuilder:
         self.DEB_OUT_DIR_APT = DEB_OUT_DIR_APT
         self.DEBIAN_INSTALL_DIR_APT = DEBIAN_INSTALL_DIR_APT
         self.IS_PREPARE_SOURCE = IS_PREPARE_SOURCE
-        self.DEBIAN_MIRROR  = "http://ports.ubuntu.com"
         self.packages = {}
 
-        self.generate_schroot_config()
-
-    def generate_schroot_config(self):
-        """
-        Generates the schroot configuration for the specified chroot environment.
-
-        Raises:
-        -------
-        - Exception: If there is an error creating the schroot environment.
-        """
-
-        logger.debug(f"Checking if chroot container '{self.CHROOT_NAME}' is already registered")
-
-        cmd = f"schroot -l | grep chroot:{self.CHROOT_NAME}"
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-
-        if result.returncode == 0:
-            logger.info(f"Schroot container {self.CHROOT_NAME} already exists. Skipping creation.")
-            return
-
-        logger.warning(f"Schroot container '{self.CHROOT_NAME}' does not exist, creating it for the first time.")
-        logger.warning(f"The chroot will be created in {self.CHROOT_DIR}/{self.CHROOT_NAME}")
-        logger.warning(f"Its config will be stored as /etc/schroot/chroot.d/{self.CHROOT_NAME}.conf")
-
-        # this command creates a chroot environment that will be named "{DIST}-{ARCH}-{SUFFIX}"
-        # We supply our own suffix, otherwise sbuild will use 'sbuild'
-        cmd = f"sbuild-createchroot --arch={self.ARCH}" \
-                                 f" --chroot-suffix=-{self.CHROOT_SUFFIX}" \
-                                 f" --components=main,universe" \
-                                 f" {self.DIST}" \
-                                 f" {self.CHROOT_DIR}/{self.CHROOT_NAME}" \
-                                 f" {self.DEBIAN_MIRROR}"
-
-        logger.debug(f"Creating schroot environment with command: {cmd}")
-
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-
-        if result.returncode != 0:
-            raise Exception(f"Error creating schroot environment: {result.stderr}")
-        else:
-            logger.info(f"Schroot environment {self.CHROOT_NAME} created successfully.")
 
     def load_packages(self):
         """Load package metadata from build_config.py and fetch dependencies from control files."""

@@ -16,7 +16,7 @@ import glob
 import shlex
 import tempfile
 import subprocess
-from helpers import cleanup_directory, check_if_root
+from helpers import cleanup_directory
 from color_logger import logger
 
 def build_dtb(deb_dir, deb_file_regex, combined_dtb_filename, out_dir):
@@ -35,12 +35,8 @@ def build_dtb(deb_dir, deb_file_regex, combined_dtb_filename, out_dir):
 
     Raises:
     -------
-    - SystemExit: If the script is not run as root, if no matching .deb files are found,
-                  or if there are errors during extraction or processing.
+    - SystemExit: If no matching .deb files are found, or if there are errors during extraction or processing.
     """
-    if not check_if_root():
-        logger.error('Please run this script as root user.')
-        exit(1)
 
     combined_dtb_bin_path = os.path.join(out_dir, 'dtb.bin')
     if os.path.exists(combined_dtb_bin_path):

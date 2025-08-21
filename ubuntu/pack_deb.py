@@ -21,7 +21,7 @@ from pathlib import Path
 from queue import Queue
 from collections import defaultdict, deque
 from constants import *
-from helpers import create_new_file, check_if_root, run_command, create_new_directory, run_command_for_result, mount_img, umount_dir, cleanup_file, build_deb_package_gz, parse_debs_manifest
+from helpers import create_new_file, run_command, create_new_directory, run_command_for_result, mount_img, umount_dir, cleanup_file, build_deb_package_gz, parse_debs_manifest
 from deb_organize import search_manifest_map_for_path
 from color_logger import logger
 
@@ -44,9 +44,6 @@ class PackagePacker:
         - IS_CLEANUP_ENABLED (bool): Flag to enable cleanup of temporary files.
         """
 
-        if not check_if_root():
-            logger.error('Please run this script as root user.')
-            exit(1)
         self.cur_file = os.path.dirname(os.path.realpath(__file__))
 
         if not len(os.listdir(MOUNT_DIR)) == 0:

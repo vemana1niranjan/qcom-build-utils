@@ -10,7 +10,7 @@ It requires root privileges to execute and utilizes various helper functions for
 logging, and file management.
 """
 
-from helpers import check_if_root, check_and_append_line_in_file, set_env, create_new_directory
+from helpers import check_and_append_line_in_file, set_env, create_new_directory
 from color_logger import logger
 import os
 import shutil
@@ -28,13 +28,7 @@ def build_kernel(source_dir: str):
     _______
     - SystemExit: If not run as root or if any build step fails
 
-    Note:
-    _____
-    - This function must be executed with root privileges
     """
-    if not check_if_root():
-        logger.error('Please run this script as root user.')
-        exit(1)
 
     set_env('ARCH', 'arm64')
     set_env('CROSS_COMPILE', 'aarch64-linux-gnu-')

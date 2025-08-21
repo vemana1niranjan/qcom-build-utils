@@ -77,7 +77,7 @@ jobs:
             gzip -9 < ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages > ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages.gz
           fi
 
-      - name : Checkout Repository With Submodules
+      - name: Checkout Repository With Submodules
         uses: actions/checkout@v4 # Using public GitHub action to checkout repo, see https://github.com/actions/checkout
         with:
           clean: true # Make sure the workspace is cleaned up from previous runs
@@ -98,8 +98,11 @@ jobs:
             cp -r debian/ WORKSPACE/sources/${{ github.event.repository.name }}
             cp -r qcom-example-package-source WORKSPACE/sources/${{ github.event.repository.name }}
 
+      - name: Validate Or Create Chroot Environment
+        run: ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/prep_chroot_env.py --arch arm64 --os-codename noble --suffix ubuntu
+
       - name: Build Debian Package
-        run : ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/build.py --workspace ./WORKSPACE --gen-debians --no-abi-check
+        run: ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/build.py --workspace ./WORKSPACE --gen-debians --no-abi-check
 
       - name: ABI Check
         run: |
