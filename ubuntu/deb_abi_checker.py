@@ -65,16 +65,15 @@ class ABI_DIFF_Result:
 
         self.abi_pkg_diff_result = None
         self.abi_pkg_diff_remark = None
+        self.abi_pkg_diff_version_check = None
         self.abi_pkg_diff_output = None
 
 # package_name - result
 global_checker_results: dict[str, ABI_DIFF_Result] = {}
 
+def produce_report(log_file=None):
 
-
-def print_results(log_file=None):
-
-    log = "ABI Check results\n"
+    log = "ABI Check results\n\n"
 
     log += ("-" * 100 + "\n")
 
@@ -93,6 +92,7 @@ def print_results(log_file=None):
         log += f"  - Version:      {result.old_deb_version}\n"
         log += f"ABI Package Diff:\n"
         log += f"  - Result:       {result.abi_pkg_diff_result}\n"
+        log += f"  - Version:      {result.abi_pkg_diff_version_check}\n"
         log += f"  - Remark:       {result.abi_pkg_diff_remark}\n"
         log += f"  - Output:       {"" if result.abi_pkg_diff_output is not None else result.abi_pkg_diff_output}\n"
         if result.abi_pkg_diff_output is not None:
@@ -126,6 +126,11 @@ def parse_arguments():
     parser.add_argument("--old-version",
                         required=False,
                         help="Specific version of the old package to compare against. (optional)")
+    
+    parser.add_argument("--result-file",
+                        required=False,
+                        help="Path for the result file")
+
     args = parser.parse_args()
 
     return args
@@ -148,7 +153,11 @@ def main():
                                          None if not args.old_version else args.old_version,
                                          print_debug_tree=print_debug_tree)
 
-    print_results(None)
+    if args.result_file is not None:
+        if not os.path.isabs(args.result_file):
+            args.result_file = os.path.abspath(args.result_file)
+
+    produce_report(args.result_file)
 
     sys.exit(ret)
 
@@ -197,7 +206,7 @@ def multiple_repo_deb_abi_checker(package_dir, apt_server_config, keep_temp=True
 
     log_file = os.path.join(package_dir, "abi_checker.log")
 
-    print_results(log_file)
+    produce_report(log_file)
 
     return final_ret
 
@@ -577,7 +586,7 @@ def single_package_abi_checker(repo_package_dir,
         logger.debug(f"[ABI_CHECKER]: Removing temporary directory {abi_check_temp_dir}")
         shutil.rmtree(abi_check_temp_dir)
 
-    analyze_abi_diff_result(old_version, new_version, abidiff_result)
+    result.abi_pkg_diff_version_check = analyze_abi_diff_result(old_version, new_version, abidiff_result)
 
     return return_value
 
@@ -676,7 +685,7 @@ def version_bumped(old_version, new_version, index):
     else:
         return False
 
-def analyze_abi_diff_result(old_version, new_version, abidiff_result):
+def analyze_abi_diff_result(old_version, new_version, abidiff_result) -> str:
     import re
 
     # Keep the first part of the version, before the first '-' or '+'
@@ -718,62 +727,71 @@ def analyze_abi_diff_result(old_version, new_version, abidiff_result):
         logger.error(f"[ABI_CHECKER]/[RESULT]: INCOMPATIBLE change detected")
 
         if major_bumped:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: OK : major version bumbed")
+            result = "PASS : Major version increased"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
             logger.debug("[ABI_CHECKER]/[RESULT]: Increasing the major version for an incompatible ABI is what is required")
-            result_pass = True
+             
         elif minor_bumped:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: NOT-OK : minor version bumbed")
+            result = "FAIL : Minor version increased, needed major increase"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
             logger.debug(f"[ABI_CHECKER]/[RESULT]: Increasing only the minor version for an incompatible ABI change is not enough")
-            result_pass = False
+
         elif patch_bumped:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: NOT-OK : patch version bumbed")
+            result = "FAIL : Patch version increased, needed major increase"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
             logger.debug(f"[ABI_CHECKER]/[RESULT]: Increasing only the patch version for an incompatible ABI change is not enough")
-            result_pass = False
+
         else:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: NOT-OK : no version bumped")
+            result = "FAIL : No version increase"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
             logger.debug(f"[ABI_CHECKER]/[RESULT]: Increasing the version number is required for an ABI change")
-            result_pass = False
 
     elif abi_change: # Compatible change
         logger.warning(f"[ABI_CHECKER]/[RESULT]: COMPATIBLE change detected")
 
         if major_bumped:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: OK : major version bumbed")
+            result = "PASS : Major version increased"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
             logger.warning(f"[ABI_CHECKER]/[RESULT]: Increasing the major version for a compatible ABI change was probably overkill, but at least it respects version increase")
-            result_pass = True
+
         elif minor_bumped:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: OK : minor version bumbed")
+            result = "PASS : Minor version increased"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
             logger.debug(f"[ABI_CHECKER]/[RESULT]: Increasing the minor version for a compatible ABI change is what is required")
-            result_pass = True
+
         elif patch_bumped:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: NOT-OK : patch version bumbed")
+            result = "FAIL : Patch version increased, needed minor increase"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
             logger.debug(f"[ABI_CHECKER]/[RESULT]: Increasing only the patch number while there is an ABI change, albeit compatible, is not enough")
-            result_pass = False
+
         else:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: NOT-OK : no version bumbed")
+            result = "FAIL : No version increase"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
             logger.debug(f"[ABI_CHECKER]/[RESULT]: Increasing at least the minor version number is required for a compatible ABI change")
-            result_pass = False
 
     else: # No change
         logger.info(f"[ABI_CHECKER]/[RESULT]: No ABI change detected")
 
         if major_bumped:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: OK : major version bumbed")
+            result = "PASS : Major version increased"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
             logger.warning("[ABI_CHECKER]/[RESULT]: Increasing the major version when there is no ABI change is probably overkill, but at least it respects version increase")
-            result_pass = True
-        elif minor_bumped:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: OK : minor version bumbed")
-            logger.warning(f"[ABI_CHECKER]/[RESULT]: Increasing the minor version for a compatible ABI change is probably overkill, but at least it respects version increase")
-            result_pass = True
-        elif patch_bumped:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: OK : patch version bumbed")
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: Increasing only the patch number while there is no ABI change seems reasonable")
-            result_pass = True
-        else:
-            logger.debug(f"[ABI_CHECKER]/[RESULT]: OK : no version bump")
-            result_pass = True
 
-    return result_pass
+        elif minor_bumped:
+            result = "PASS : Minor version increased"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
+            logger.warning(f"[ABI_CHECKER]/[RESULT]: Increasing the minor version for a compatible ABI change is probably overkill, but at least it respects version increase")
+
+        elif patch_bumped:
+            result = "PASS : Patch version increased"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: Increasing only the patch number while there is no ABI change seems reasonable")
+
+        else:
+            result = "PASS : No version increase"
+            logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
+
+    return result
 
 if __name__ == "__main__":
     main()

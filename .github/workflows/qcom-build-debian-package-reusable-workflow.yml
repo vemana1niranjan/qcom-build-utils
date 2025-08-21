@@ -148,7 +148,8 @@ jobs:
 
           ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/deb_abi_checker.py \
             --new-package-dir ./WORKSPACE/debian_packages/temp/${{ github.event.repository.name }} \
-            --apt-server-config "deb [arch=${{ env.PRODUCT_ARCH }} trusted=yes] http://localhost:${{ env.PPA_HTTP_SERVER_PORT }} ${{ env.PRODUCT_CODENAME }}/stable main"
+            --apt-server-config "deb [arch=${{ env.PRODUCT_ARCH }} trusted=yes] http://localhost:${{ env.PPA_HTTP_SERVER_PORT }} ${{ env.PRODUCT_CODENAME }}/stable main" \
+            --result-file ./results.txt
 
           RET=$?
           set -e
@@ -163,37 +164,47 @@ jobs:
           # Bit 4 (16): RETURN_PPA_ERROR
 
           if (( RET == 0 )); then
-            echo "ABI check returned NO_DIFF"
+            echo "✅ ABI check returned NO_DIFF"
           fi
 
           if (( RET & 1 )); then
-            echo "ABI check returned COMPATIBLE DIFF"
+            echo "⚠️ABI check returned COMPATIBLE DIFF"
           fi
 
           if (( RET & 2 )); then
-            echo "ABI check returned INCOMPATIBLE DIFF"
+            echo "⚠️ABI check returned INCOMPATIBLE DIFF"
           fi
 
           if (( RET & 4 )); then
-            echo "ABI check returned STRIPPED PACKAGE"
+            echo "❌ ABI check returned STRIPPED PACKAGE"
             exit 1
           fi
 
           if (( RET & 8 )); then
-            echo "ABI check failed because the PPA did not contained an old version for the package."
+            echo "⚠️ABI check failed because the PPA did not contained an old version for the package."
             echo "Assumption is that this is the first time the package was build."
             echo "INITIAL_UPLOAD_TO_PPA=true" >> $GITHUB_ENV
           fi
 
           if (( RET & 16 )); then
-            echo "ABI check failed because there was an error on the PPA"
+            echo "❌ ABI check failed because there was an error on the PPA"
           fi
 
           echo "ABI_CHECK_RETURN_VALUE=${RET}" >> $GITHUB_ENV
 
       - name: Package Version Increment Check
         if: ${{ env.INITIAL_UPLOAD_TO_PPA == 'false' }}
-        run: echo "Run package version check here with ret value ${{ env.ABI_CHECK_RETURN_VALUE }}"
+        run: |
+          echo "Run package version check here with ret value ${{ env.ABI_CHECK_RETURN_VALUE }}"
+          echo "Content of result file :"
+          cat ./results.txt          
+
+          if grep -qE '^- Version.*FAIL' ./results.txt; then
+            echo "❌ Test failed: At least one FAIL found in - Version: line"
+            exit 1
+          else
+            echo "✅ Test passed: All versions are PASS"
+          fi
 
       - name: Upload Debian Packages To PPA Server If First Build
         if: ${{ env.INITIAL_UPLOAD_TO_PPA == 'true' }}
