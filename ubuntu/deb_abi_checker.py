@@ -194,7 +194,7 @@ def multiple_repo_deb_abi_checker(package_dir, apt_server_config, keep_temp=True
 
                 traceback.print_exc()
                 sys.exit(-1)
-                
+
     log_file = os.path.join(package_dir, "abi_checker.log")
 
     print_results(log_file)
@@ -578,7 +578,7 @@ def single_package_abi_checker(repo_package_dir,
         shutil.rmtree(abi_check_temp_dir)
 
     analyze_abi_diff_result(old_version, new_version, abidiff_result)
-    
+
     return return_value
 
 def extract_deb(deb_path, dev_path, ddeb_path, extract_dir):

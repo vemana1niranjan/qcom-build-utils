@@ -11,10 +11,10 @@ on:
         description: 'Whether to clear the PPA'
         type: boolean
         required: false
-        default: false        
+        default: false
     secrets:
       ACTIONS_SSH_KEY:
-        required: true     
+        required: true
 
 permissions:
   contents: read
@@ -28,18 +28,53 @@ env:
   # This variable is set to true below if the ABI check is not able to find an initial
   # version of the package in the PPA
   INITIAL_UPLOAD_TO_PPA: false
+  ABI_CHECK_RETURN_VALUE: 0
+
+  PRODUCT_DISTRO: null
+  PRODUCT_CODENAME: null
+  PRODUCT_ARCH: null
+
 jobs:
   build-debian-package-reusable-workflow:
+
     runs-on: [self-hosted, Linux, ARM64]
 
     steps:
-      - name: Clear PPA if requested
+
+      - name: Ensure Workspace Is Clean
+        run: rm -rf * # Ensure workspace is clean from previous runs
+
+      - name: Checkout Repository And Submodules Recursively
+        uses: actions/checkout@v4 # Using public GitHub action to checkout repo, see https://github.com/actions/checkout
+        with:
+          clean: true # Make sure the workspace is cleaned up from previous runs
+          submodules: 'recursive' # Make sure all submodules are recursively checked out
+          ssh-key: ${{ secrets.ACTIONS_SSH_KEY }} # Add SSH key for cloning private repos
+          fetch-depth: 1 # Speedup things since full history isn't needed
+
+      - name: Exctract Product Configuration From qcom-product.conf
+        run: |
+          CONFIG_FILE="qcom-distro-ubuntu/qcom-product.conf"
+
+          DISTRO=$(grep '^Distro:' "$CONFIG_FILE" | cut -d':' -f2 | xargs)
+          CODENAME=$(grep '^Codename:' "$CONFIG_FILE" | cut -d':' -f2 | xargs)
+          ARCH=$(grep '^Arch:' "$CONFIG_FILE" | cut -d':' -f2 | xargs)
+
+          echo "Distro: $DISTRO"
+          echo "Codename: $CODENAME"
+          echo "Arch: $ARCH"
+
+          echo "PRODUCT_DISTRO=${DISTRO}" >> $GITHUB_ENV
+          echo "PRODUCT_CODENAME=${CODENAME}" >> $GITHUB_ENV
+          echo "PRODUCT_ARCH=${ARCH}" >> $GITHUB_ENV
+
+      - name: Clear PPA If Requested
         if: ${{ inputs.clear_ppa == true }}
         run: |
           rm -rf ${{ env.PPA_HTTP_DIRECTORY }}/*
           echo "Directory ${{ env.PPA_HTTP_DIRECTORY }} removed"
 
-      - name: Setup HTTP PPA server
+      - name: Verify Local Test HTTP PPA Server Is Running
         run : |
           echo "Check if PPA serving folder exists ${{ env.PPA_HTTP_DIRECTORY }}"
           if [ -d "${{ env.PPA_HTTP_DIRECTORY }}" ]; then
@@ -50,7 +85,7 @@ jobs:
           fi
 
           echo "Check if PPA html server is running"
-      
+
           if screen -list | grep -q "${{ env.PPA_HTTP_SERVER_SCREEN_NAME }}"; then
             echo "Screen session ${{ env.PPA_HTTP_SERVER_SCREEN_NAME }} already exists. Skipping server start."
           else
@@ -67,34 +102,23 @@ jobs:
           fi
 
           echo "Check if PPA server is populated"
-          if [ -f "${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages.gz" ]; then
+          if [ -f "${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages.gz" ]; then
             echo "PPA server is populated, listing the content of Packages:"
-            cat ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages
+            cat ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages
           else
             echo "Error: PPA server is not populated. Populating"
-            mkdir -p ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/
-            dpkg-scanpackages ${{ env.PPA_HTTP_DIRECTORY }} > ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages
-            gzip -9 < ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages > ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages.gz
+            mkdir -p ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/
+            dpkg-scanpackages ${{ env.PPA_HTTP_DIRECTORY }} > ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages
+            gzip -9 < ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages > ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages.gz
           fi
 
-      - name: Ensure Workspace Is Clean
-        run: rm -rf * # Ensure workspace is clean from previous runs
-        
-      - name: Checkout Repository With Submodules
-        uses: actions/checkout@v4 # Using public GitHub action to checkout repo, see https://github.com/actions/checkout
-        with:
-          clean: true # Make sure the workspace is cleaned up from previous runs
-          submodules: 'recursive' # Make sure all submodules are recursively checked out
-          ssh-key: ${{ secrets.ACTIONS_SSH_KEY }} # Add SSH key for cloning private repos
-          fetch-depth: 1 # Speedup things since full history isn't needed
-
-      - name: Prepare Workspace Structure
+      - name: Prepare Workspace Structure For The Build
         # The build.py script expects a specific directory structure
         # This step creates the required directories and links the example package sources to the expected location
         # The build_deb script will go through the WORKSPACE/sources directory and find every "debian" folder and exctract the package names
-        # from the Control file and build a list of available packages to build. 
+        # from the Control file and build a list of available packages to build.
         run: |
-            echo "Listing the content of what was checked out"; tree
+            echo "Listing the content of what was checked out, exclusing .md files : "; tree -I '*.md'
             mkdir WORKSPACE
             mkdir WORKSPACE/sources
             mkdir WORKSPACE/sources/${{ github.event.repository.name }}
@@ -102,20 +126,29 @@ jobs:
             cp -r qcom-example-package-source WORKSPACE/sources/${{ github.event.repository.name }}
 
       - name: Validate Or Create Chroot Environment
-        run: ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/prep_chroot_env.py --arch arm64 --os-codename noble --suffix ubuntu
+        run: |
+          ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/prep_chroot_env.py \
+            --arch        ${{ env.PRODUCT_ARCH }} \
+            --os-codename ${{ env.PRODUCT_CODENAME }} \
+            --suffix      ${{ env.PRODUCT_DISTRO }}
 
-      - name: Build Debian Package
-        run: ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/build.py --workspace ./WORKSPACE --gen-debians
+      - name: Build Debian Packages
+        run: |
+          ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/build.py \
+            --workspace ./WORKSPACE \
+            --gen-debians
 
       - name: ABI Check
         run: |
           set +e
+
           ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/deb_abi_checker.py \
             --new-package-dir ./WORKSPACE/debian_packages/temp/${{ github.event.repository.name }} \
-            --apt-server-config "deb [arch=arm64 trusted=yes] http://localhost:${{ env.PPA_HTTP_SERVER_PORT }} noble/stable main"
+            --apt-server-config "deb [arch=${{ env.PRODUCT_ARCH }} trusted=yes] http://localhost:${{ env.PPA_HTTP_SERVER_PORT }} ${{ env.PRODUCT_CODENAME }}/stable main"
+
           RET=$?
-          set -e 
-          
+          set -e
+
           echo "ABI check returned $RET"
 
           #       (0):  RETURN_ABI_NO_DIFF
@@ -151,7 +184,12 @@ jobs:
             echo "ABI check failed because there was an error on the PPA"
           fi
 
-      - name: Upload Debian Package To PPA Server If First Build
+          echo "ABI_CHECK_RETURN_VALUE=${RET}" >> $GITHUB_ENV
+
+      - name: Package Version Increment Check
+        run: echo "Run package version check here with ret value ${{ env.ABI_CHECK_RETURN_VALUE }}"
+
+      - name: Upload Debian Packages To PPA Server If First Build
         if: ${{ env.INITIAL_UPLOAD_TO_PPA == 'true' }}
         run: |
           echo "Uploading Debian Package To PPA Server..."
@@ -160,21 +198,21 @@ jobs:
 
           echo "Removing olf Packages/.gz files"
 
-          rm -f ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages || true
-          rm -f ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages.gz || true
-          
+          rm -f ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages || true
+          rm -f ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages.gz || true
+
           echo "Updating the Packages/.gz files"
 
-          touch ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages
+          touch ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages
 
           for dir in ${{ env.PPA_HTTP_DIRECTORY }}/oss/*/; do
             echo "Updating packages for dir $dir"
-            dpkg-scanpackages "$dir" | sed 's|/var/www/html/github-actions-ppa/||'             >> "${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages"
-            dpkg-scanpackages --type ddeb "$dir" | sed 's|/var/www/html/github-actions-ppa/||' >> "${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages"
+            dpkg-scanpackages "$dir" | sed 's|/var/www/html/github-actions-ppa/||'             >> "${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages"
+            dpkg-scanpackages --type ddeb "$dir" | sed 's|/var/www/html/github-actions-ppa/||' >> "${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages"
           done
 
-          gzip -9 < "${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages" > "${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages.gz"
+          gzip -9 < "${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages" > "${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages.gz"
 
           echo "Updated the packages.gz files"
 
-          echo "Updated the Packages files for suite: noble"
+          echo "Updated the Packages files for suite: ${{ env.PRODUCT_CODENAME }}"
