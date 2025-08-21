@@ -27,12 +27,14 @@ env:
 
   # This variable is set to true below if the ABI check is not able to find an initial
   # version of the package in the PPA
-  INITIAL_UPLOAD_TO_PPA: false
+  INITIAL_UPLOAD_TO_PPA: 'false'
   ABI_CHECK_RETURN_VALUE: 0
 
   PRODUCT_DISTRO: null
   PRODUCT_CODENAME: null
   PRODUCT_ARCH: null
+
+  PPA_PACKAGES_FILE_DIR: null
 
 jobs:
   build-debian-package-reusable-workflow:
@@ -68,6 +70,8 @@ jobs:
           echo "PRODUCT_CODENAME=${CODENAME}" >> $GITHUB_ENV
           echo "PRODUCT_ARCH=${ARCH}" >> $GITHUB_ENV
 
+          echo "PPA_PACKAGES_FILE_DIR=${{env.PPA_HTTP_DIRECTORY}}/dists/$CODENAME/stable/main/binary-$ARCH" >> $GITHUB_ENV
+
       - name: Clear PPA If Requested
         if: ${{ inputs.clear_ppa == true }}
         run: |
@@ -102,14 +106,14 @@ jobs:
           fi
 
           echo "Check if PPA server is populated"
-          if [ -f "${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages.gz" ]; then
+          if [ -f "${{ env.PPA_PACKAGES_FILE_DIR }}/Packages.gz" ]; then
             echo "PPA server is populated, listing the content of Packages:"
-            cat ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages
+            cat ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages
           else
             echo "Error: PPA server is not populated. Populating"
-            mkdir -p ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/
-            dpkg-scanpackages ${{ env.PPA_HTTP_DIRECTORY }} > ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages
-            gzip -9 < ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages > ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages.gz
+            mkdir -p ${{ env.PPA_PACKAGES_FILE_DIR }}
+            dpkg-scanpackages ${{ env.PPA_HTTP_DIRECTORY }} > ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages
+            gzip -9 < ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages > ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages.gz
           fi
 
       - name: Prepare Workspace Structure For The Build
@@ -118,7 +122,7 @@ jobs:
         # The build_deb script will go through the WORKSPACE/sources directory and find every "debian" folder and exctract the package names
         # from the Control file and build a list of available packages to build.
         run: |
-            echo "Listing the content of what was checked out, exclusing .md files : "; tree -I '*.md'
+            echo "Listing the content of what was checked out, exclusing .md files : "; tree -I '*.md|LICENSE.txt'
             mkdir WORKSPACE
             mkdir WORKSPACE/sources
             mkdir WORKSPACE/sources/${{ github.event.repository.name }}
@@ -172,6 +176,7 @@ jobs:
 
           if (( RET & 4 )); then
             echo "ABI check returned STRIPPED PACKAGE"
+            exit 1
           fi
 
           if (( RET & 8 )); then
@@ -187,6 +192,7 @@ jobs:
           echo "ABI_CHECK_RETURN_VALUE=${RET}" >> $GITHUB_ENV
 
       - name: Package Version Increment Check
+        if: ${{ env.INITIAL_UPLOAD_TO_PPA == 'false' }}
         run: echo "Run package version check here with ret value ${{ env.ABI_CHECK_RETURN_VALUE }}"
 
       - name: Upload Debian Packages To PPA Server If First Build
@@ -198,20 +204,20 @@ jobs:
 
           echo "Removing olf Packages/.gz files"
 
-          rm -f ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages || true
-          rm -f ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages.gz || true
+          rm -f ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages || true
+          rm -f ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages.gz || true
 
           echo "Updating the Packages/.gz files"
 
-          touch ${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages
+          touch ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages
 
           for dir in ${{ env.PPA_HTTP_DIRECTORY }}/oss/*/; do
             echo "Updating packages for dir $dir"
-            dpkg-scanpackages "$dir" | sed 's|/var/www/html/github-actions-ppa/||'             >> "${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages"
-            dpkg-scanpackages --type ddeb "$dir" | sed 's|/var/www/html/github-actions-ppa/||' >> "${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages"
+            dpkg-scanpackages "$dir" | sed 's|/var/www/html/github-actions-ppa/||'             >> "${{ env.PPA_PACKAGES_FILE_DIR }}/Packages"
+            dpkg-scanpackages --type ddeb "$dir" | sed 's|/var/www/html/github-actions-ppa/||' >> "${{ env.PPA_PACKAGES_FILE_DIR }}/Packages"
           done
 
-          gzip -9 < "${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages" > "${{ env.PPA_HTTP_DIRECTORY }}/dists/${{ env.PRODUCT_CODENAME }}/stable/main/binary-${{ env.PRODUCT_ARCH }}/Packages.gz"
+          gzip -9 < "${{ env.PPA_PACKAGES_FILE_DIR }}/Packages" > "${{ env.PPA_PACKAGES_FILE_DIR }}/Packages.gz"
 
           echo "Updated the packages.gz files"
 
