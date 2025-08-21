@@ -77,6 +77,9 @@ jobs:
             gzip -9 < ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages > ${{ env.PPA_HTTP_DIRECTORY }}/dists/noble/stable/main/binary-arm64/Packages.gz
           fi
 
+      - name: Ensure Workspace Is Clean
+        run: rm -rf * # Ensure workspace is clean from previous runs
+        
       - name: Checkout Repository With Submodules
         uses: actions/checkout@v4 # Using public GitHub action to checkout repo, see https://github.com/actions/checkout
         with:
