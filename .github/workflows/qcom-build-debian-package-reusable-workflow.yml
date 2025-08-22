@@ -2,6 +2,10 @@ name: Qualcomm Build Debian Package Reusable Workflow
 on:
   workflow_call:
     inputs:
+      ref:
+        description: The ref name thad was used to invoke this reusable workflow
+        type: string
+        required: true
       use_local_ppa:
         description: 'Whether to use a local PPA for testing'
         type: boolean
@@ -26,7 +30,7 @@ env:
   PPA_HTTP_SERVER_SCREEN_NAME: github-actions-ppa-http-server
 
   # This variable is set to true below if the ABI check is not able to find an initial
-  # version of the package in the PPA
+  # version of the package in the PPA.
   INITIAL_UPLOAD_TO_PPA: 'false'
   ABI_CHECK_RETURN_VALUE: 0
 
@@ -45,6 +49,17 @@ jobs:
 
       - name: Ensure Workspace Is Clean
         run: rm -rf * # Ensure workspace is clean from previous runs
+
+      # This checkout is done so that any change in qcom-build-utils doesnt't need to be propagated up
+      # Simply relaunching a job that uses this reusable workflow for a given ref will automatically see the changes
+      - name: Checkout Tip of qcom-build-utils For The Specified Ref
+        uses: actions/checkout@v4
+        with:
+          repository: qualcomm-linux/qcom-build-utils
+          ref: ${{ inputs.ref }}
+          ssh-key: ${{ secrets.ACTIONS_SSH_KEY }}
+          path: qcom-build-utils
+          fetch-depth: 1
 
       - name: Checkout Repository And Submodules Recursively
         uses: actions/checkout@v4 # Using public GitHub action to checkout repo, see https://github.com/actions/checkout
@@ -189,6 +204,7 @@ jobs:
 
           if (( RET & 16 )); then
             echo "❌ ABI check failed because there was an error on the PPA"
+            exit 1
           fi
 
           echo "ABI_CHECK_RETURN_VALUE=${RET}" >> $GITHUB_ENV
