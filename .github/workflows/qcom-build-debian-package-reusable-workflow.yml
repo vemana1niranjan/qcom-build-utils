@@ -25,9 +25,7 @@ permissions:
   security-events: write
 
 env:
-  PPA_HTTP_DIRECTORY: /var/www/html/github-actions-ppa
-  PPA_HTTP_SERVER_PORT: 12345
-  PPA_HTTP_SERVER_SCREEN_NAME: github-actions-ppa-http-server
+  PPA_URL: https://qualcomm-linux.github.io/qcom-oss-staging-ppa/
 
   # This variable is set to true below if the ABI check is not able to find an initial
   # version of the package in the PPA.
@@ -38,7 +36,7 @@ env:
   PRODUCT_CODENAME: null
   PRODUCT_ARCH: null
 
-  PPA_PACKAGES_FILE_DIR: null
+  PPA_PACKAGES_FILE_REPO_PATH: null
 
 jobs:
   build-debian-package-reusable-workflow:
@@ -86,57 +84,13 @@ jobs:
           echo "PRODUCT_CODENAME=${CODENAME}" >> $GITHUB_ENV
           echo "PRODUCT_ARCH=${ARCH}" >> $GITHUB_ENV
 
-          echo "PPA_PACKAGES_FILE_DIR=${{env.PPA_HTTP_DIRECTORY}}/dists/$CODENAME/stable/main/binary-$ARCH" >> $GITHUB_ENV
+          echo "PPA_PACKAGES_FILE_REPO_PATH=dists/$CODENAME/stable/main/binary-$ARCH" >> $GITHUB_ENV
 
-      - name: Clear PPA If Requested
-        if: ${{ inputs.clear_ppa == true }}
-        run: |
-          rm -rf ${{ env.PPA_HTTP_DIRECTORY }}/*
-          echo "Directory ${{ env.PPA_HTTP_DIRECTORY }} removed"
-
-      - name: Verify Local Test HTTP PPA Server Is Running
-        run : |
-          echo "Check if PPA serving folder exists ${{ env.PPA_HTTP_DIRECTORY }}"
-          if [ -d "${{ env.PPA_HTTP_DIRECTORY }}" ]; then
-            echo "Directory exists"
-          else
-            echo "Directory does not exist"
-            mkdir ${{ env.PPA_HTTP_DIRECTORY }}
-          fi
-
-          echo "Check if PPA html server is running"
-
-          if screen -list | grep -q "${{ env.PPA_HTTP_SERVER_SCREEN_NAME }}"; then
-            echo "Screen session ${{ env.PPA_HTTP_SERVER_SCREEN_NAME }} already exists. Skipping server start."
-          else
-            screen -dmS ${{ env.PPA_HTTP_SERVER_SCREEN_NAME }} bash -c 'python3 -m http.server ${{ env.PPA_HTTP_SERVER_PORT }} --directory ${{ env.PPA_HTTP_DIRECTORY }}'
-            echo "Started HTTP server in screen session ${{ env.PPA_HTTP_SERVER_SCREEN_NAME }}"
-          fi
-
-          echo "Check if PPA server works"
-          if curl --silent --output /dev/null --fail http://localhost:${{ env.PPA_HTTP_SERVER_PORT }}/; then
-            echo "HTTP server works"
-          else
-            echo "Error: HTTP server is not responding. Exiting"
-            exit 1
-          fi
-
-          echo "Check if PPA server is populated"
-          if [ -f "${{ env.PPA_PACKAGES_FILE_DIR }}/Packages.gz" ]; then
-            echo "PPA server is populated, listing the content of Packages:"
-            cat ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages
-          else
-            echo "Error: PPA server is not populated. Populating"
-            mkdir -p ${{ env.PPA_PACKAGES_FILE_DIR }}
-            dpkg-scanpackages ${{ env.PPA_HTTP_DIRECTORY }} > ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages
-            gzip -9 < ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages > ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages.gz
-          fi
-
-      - name: Prepare Workspace Structure For The Build
         # The build.py script expects a specific directory structure
         # This step creates the required directories and links the example package sources to the expected location
         # The build_deb script will go through the WORKSPACE/sources directory and find every "debian" folder and exctract the package names
         # from the Control file and build a list of available packages to build.
+      - name: Prepare Workspace Structure For The Build
         run: |
             echo "Listing the content of what was checked out, exclusing .md files : "; tree -I '*.md|LICENSE.txt'
             mkdir WORKSPACE
@@ -164,7 +118,7 @@ jobs:
 
           ./qcom-build-utils/scripts/deb_abi_checker.py \
             --new-package-dir ./WORKSPACE/debian_packages/temp/${{ github.event.repository.name }} \
-            --apt-server-config "deb [arch=${{ env.PRODUCT_ARCH }} trusted=yes] http://localhost:${{ env.PPA_HTTP_SERVER_PORT }} ${{ env.PRODUCT_CODENAME }}/stable main" \
+            --apt-server-config "deb [arch=${{ env.PRODUCT_ARCH }} trusted=yes] ${{ env.PPA_URL }} ${{ env.PRODUCT_CODENAME }}/stable main" \
             --result-file ./results.txt
 
           RET=$?
@@ -223,31 +177,43 @@ jobs:
             echo "✅ Test passed: All versions are PASS"
           fi
 
+      - name: Checkout PPA staging repo
+        if: ${{ env.INITIAL_UPLOAD_TO_PPA == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          repository: qualcomm-linux/qcom-oss-staging-ppa
+          ref: main
+          ssh-key: ${{ secrets.ACTIONS_SSH_KEY }}
+          path: ./qcom-oss-staging-ppa
+          fetch-depth: 1
 
       - name: Upload Debian Packages To PPA Server If First Build
         if: ${{ env.INITIAL_UPLOAD_TO_PPA == 'true' }}
         run: |
-          echo "Uploading Debian Package To PPA Server..."
-          cp -r ./WORKSPACE/debian_packages/oss/ ${{ env.PPA_HTTP_DIRECTORY }}
-          echo "Copied, here is the new tree of the PPA :"; tree ${{ env.PPA_HTTP_DIRECTORY }}
+          echo "Uploading Debian Package To PPA Server : ${{ env.PPA_URL }}"
+          
+          for dir in ./WORKSPACE/debian_packages/oss/*/; do
+            PACKAGE=$(basename $dir)
+            echo "Creating directory for package $PACKAGE" in the PPA
+            mkdir -p ./qcom-oss-staging-ppa/pool/${{env.PRODUCT_CODENAME}}/stable/main/$PACKAGE
 
-          echo "Removing olf Packages/.gz files"
+            echo "Packages to copy for $PACKAGE: "; ls ./WORKSPACE/debian_packages/oss/$PACKAGE
 
-          rm -f ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages || true
-          rm -f ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages.gz || true
-
-          echo "Updating the Packages/.gz files"
-
-          touch ${{ env.PPA_PACKAGES_FILE_DIR }}/Packages
-
-          for dir in ${{ env.PPA_HTTP_DIRECTORY }}/oss/*/; do
-            echo "Updating packages for dir $dir"
-            dpkg-scanpackages "$dir" | sed 's|/var/www/html/github-actions-ppa/||'             >> "${{ env.PPA_PACKAGES_FILE_DIR }}/Packages"
-            dpkg-scanpackages --type ddeb "$dir" | sed 's|/var/www/html/github-actions-ppa/||' >> "${{ env.PPA_PACKAGES_FILE_DIR }}/Packages"
+            cp ./WORKSPACE/debian_packages/oss/$PACKAGE/* ./qcom-oss-staging-ppa/pool/${{env.PRODUCT_CODENAME}}/stable/main/$PACKAGE
           done
 
-          gzip -9 < "${{ env.PPA_PACKAGES_FILE_DIR }}/Packages" > "${{ env.PPA_PACKAGES_FILE_DIR }}/Packages.gz"
+          cd ./qcom-oss-staging-ppa
 
-          echo "Updated the packages.gz files"
+          dpkg-scanpackages --multiversion pool/${{ env.PRODUCT_CODENAME }} > ${{ env.PPA_PACKAGES_FILE_REPO_PATH }}/Packages
+          dpkg-scanpackages --type ddeb --multiversion pool/${{ env.PRODUCT_CODENAME }} >> ${{ env.PPA_PACKAGES_FILE_REPO_PATH }}/Packages
 
-          echo "Updated the Packages files for suite: ${{ env.PRODUCT_CODENAME }}"
+          gzip -k -f ${{ env.PPA_PACKAGES_FILE_REPO_PATH }}/Packages
+
+          cat ${{ env.PPA_PACKAGES_FILE_REPO_PATH }}/Packages
+
+          git add .
+          
+          #TODO craft decent message
+          git commit -s -m "Uploaded Packages"
+
+          git push
