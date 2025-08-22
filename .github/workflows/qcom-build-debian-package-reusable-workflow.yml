@@ -58,14 +58,14 @@ jobs:
           repository: qualcomm-linux/qcom-build-utils
           ref: ${{ inputs.ref }}
           ssh-key: ${{ secrets.ACTIONS_SSH_KEY }}
-          path: qcom-build-utils
+          path: ./qcom-build-utils
           fetch-depth: 1
 
       - name: Checkout Repository And Submodules Recursively
         uses: actions/checkout@v4 # Using public GitHub action to checkout repo, see https://github.com/actions/checkout
         with:
           ref: ${{ github.head_ref }}
-          clean: true # Make sure the workspace is cleaned up from previous runs
+          clean: false # A rm -rf * was done first, don't clean otherwise this would delete qcom-build-utils cloned above
           submodules: 'recursive' # Make sure all submodules are recursively checked out
           ssh-key: ${{ secrets.ACTIONS_SSH_KEY }} # Add SSH key for cloning private repos
           fetch-depth: 1 # Speedup things since full history isn't needed
@@ -147,14 +147,14 @@ jobs:
 
       - name: Validate Or Create Chroot Environment
         run: |
-          ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/prep_chroot_env.py \
+          ./qcom-build-utils/scripts/prep_chroot_env.py \
             --arch        ${{ env.PRODUCT_ARCH }} \
             --os-codename ${{ env.PRODUCT_CODENAME }} \
             --suffix      ${{ env.PRODUCT_DISTRO }}
 
       - name: Build Debian Packages
         run: |
-          ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/build.py \
+          ./qcom-build-utils/scripts/build.py \
             --workspace ./WORKSPACE \
             --gen-debians
 
@@ -162,7 +162,7 @@ jobs:
         run: |
           set +e
 
-          ./qcom-distro-ubuntu/qcom-build-utils/ubuntu/deb_abi_checker.py \
+          ./qcom-build-utils/scripts/deb_abi_checker.py \
             --new-package-dir ./WORKSPACE/debian_packages/temp/${{ github.event.repository.name }} \
             --apt-server-config "deb [arch=${{ env.PRODUCT_ARCH }} trusted=yes] http://localhost:${{ env.PPA_HTTP_SERVER_PORT }} ${{ env.PRODUCT_CODENAME }}/stable main" \
             --result-file ./results.txt
