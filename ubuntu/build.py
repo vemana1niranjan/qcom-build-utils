@@ -109,8 +109,6 @@ def parse_arguments():
                         help="Prepares sources, does not build", default=False)
     parser.add_argument("--no-abi-check", action="store_true",
                         help="Skip ABI compatibility check", default=False)
-    parser.add_argument("--force-abi-check", action="store_true",
-                        help="Skip ABI compatibility check", default=False)
 
     # Deprecated
     parser.add_argument('--chroot-name', type=str, required=False,
@@ -187,7 +185,6 @@ PACK_VARIANT = args.pack_variant
 
 TARGET_HW = args.flat_meta
 NO_ABI_CHECK = args.no_abi_check
-FORCE_ABI_CHECK = args.force_abi_check
 
 # Define kernel and output directories
 KERNEL_DIR = args.kernel_src_dir
@@ -197,7 +194,7 @@ OUT_DIR = os.path.join(WORKSPACE_DIR, "out")
 DEB_OUT_DIR = os.path.join(WORKSPACE_DIR, "debian_packages")
 
 OSS_DEB_OUT_DIR = os.path.join(DEB_OUT_DIR, "oss")
-
+QC_FOLDER = os.path.join(WORKSPACE_DIR, "qc")
 KERNEL_DEB_OUT_DIR = (
     args.kernel_dest_dir if args.kernel_dest_dir
     else args.kernel_deb_path if args.kernel_deb_path
@@ -293,12 +290,9 @@ if IF_GEN_DEBIANS or IS_PREPARE_SOURCE :
 
 if NO_ABI_CHECK:
     logger.warning("ABI check is explicitely disabled. Skipping ABI check.")
-elif (not IF_GEN_DEBIANS and not IS_PREPARE_SOURCE) and not FORCE_ABI_CHECK:
+elif (not IF_GEN_DEBIANS and not IS_PREPARE_SOURCE):
     logger.debug("Skipping ABI check since no debian packages generated")
 else:
-    if FORCE_ABI_CHECK and (not IF_GEN_DEBIANS and not IS_PREPARE_SOURCE):
-        logger.info("Forcing ABI check even if no debian package were built")
-
     error_during_abi_check = False
 
     logger.info("Running the ABI checking phase")
@@ -364,7 +358,8 @@ if IF_PACK_IMAGE:
 
         build_dtb(KERNEL_DEB_OUT_DIR, LINUX_MODULES_DEB, COMBINED_DTB_FILE, OUT_DIR)
 
-        packer = PackagePacker(MOUNT_DIR, IMAGE_TYPE, PACK_VARIANT, OUT_DIR, OUT_SYSTEM_IMG, APT_SERVER_CONFIG, DEB_OUT_TEMP_DIR, DEB_OUT_DIR, DEBIAN_INSTALL_DIR, IS_CLEANUP_ENABLED, PACKAGES_MANIFEST_PATH)
+        packer = PackagePacker(MOUNT_DIR, IMAGE_TYPE, PACK_VARIANT, OUT_DIR, OUT_SYSTEM_IMG, APT_SERVER_CONFIG, DEB_OUT_TEMP_DIR, DEB_OUT_DIR, DEBIAN_INSTALL_DIR, IS_CLEANUP_ENABLED, PACKAGES_MANIFEST_PATH,QC_FOLDER)
+
         packer.build_image()
 
     except Exception as e:
