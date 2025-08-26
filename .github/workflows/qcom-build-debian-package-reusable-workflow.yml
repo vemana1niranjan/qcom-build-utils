@@ -86,6 +86,12 @@ jobs:
 
           echo "PPA_PACKAGES_FILE_REPO_PATH=dists/$CODENAME/stable/main/binary-$ARCH" >> $GITHUB_ENV
 
+      - name: Build .dsc
+        run: dpkg-source -b .
+
+      - name: Run lintian
+        run: lintian ../*.dsc
+
         # The build.py script expects a specific directory structure
         # This step creates the required directories and links the example package sources to the expected location
         # The build_deb script will go through the WORKSPACE/sources directory and find every "debian" folder and exctract the package names
