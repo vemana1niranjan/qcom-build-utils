@@ -126,7 +126,7 @@ def parse_arguments():
     parser.add_argument("--old-version",
                         required=False,
                         help="Specific version of the old package to compare against. (optional)")
-    
+
     parser.add_argument("--result-file",
                         required=False,
                         help="Path for the result file")
@@ -569,7 +569,7 @@ def single_package_abi_checker(repo_package_dir,
                     logger.debug(f"Content of {filename}:")
                     logger.warning(file.read())
 
-        
+
     else:
         result.abi_pkg_diff_result = "NO-DIFF"
         logger.info(f"[ABI_CHECKER]/{package_name}: abipkgdiff did not find any differences between old and new packages")
@@ -743,7 +743,7 @@ def analyze_abi_diff_result(old_version, new_version, abidiff_result) -> str:
             result = "PASS : Major version increased"
             logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")
             logger.debug("[ABI_CHECKER]/[RESULT]: Increasing the major version for an incompatible ABI is what is required")
-             
+
         elif minor_bumped:
             result = "FAIL : Minor version increased, needed major increase"
             logger.debug(f"[ABI_CHECKER]/[RESULT]: {result}")

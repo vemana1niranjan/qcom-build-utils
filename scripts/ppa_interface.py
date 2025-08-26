@@ -7,7 +7,7 @@
 """
 ppa_interface.py
 
-Helper script to interface a PPA. 
+Helper script to interface a PPA.
 All operations are performed without messing with the host configurations.
 
 This script can query or download a package for a latest version or a specific one.
@@ -70,7 +70,7 @@ def setup():
     create_new_directory(TEMP_DIR, delete_if_exists=False)
 
     SOURCE_LIST_FILE = os.path.join(TEMP_DIR, "sources.list")
-    
+
     with open(SOURCE_LIST_FILE, "w") as f:
         f.write(APT_CONFIG)
 
@@ -89,7 +89,7 @@ def run_apt_update() -> bool :
     logger.debug(f"[PPA_INTERFACE]/{PACKAGE_NAME}: Running: {command}")
 
     apt_ret = subprocess.run(command, cwd=TEMP_DIR, shell=True, capture_output=True)
-    
+
     if apt_ret.returncode != 0:
         logger.critical(f"[PPA_INTERFACE]/{PACKAGE_NAME}: Failed to update package list: {apt_ret.stderr}")
         return False
@@ -114,11 +114,11 @@ def download_package() -> bool :
 
 
     apt_ret = subprocess.run(command, cwd=TEMP_DIR, shell=True, capture_output=True)
-    
+
     if apt_ret.returncode != 0:
         logger.error(f"[PPA_INTERFACE]/[DOWNLOAD]/{PACKAGE_NAME}: Failed to download {package}: {apt_ret.stderr}")
         return False
-    
+
     logger.info(f"[PPA_INTERFACE]/[DOWNLOAD]/{PACKAGE_NAME}: Downloaded {package}:\n{apt_ret.stdout}")
 
     return True
@@ -129,7 +129,7 @@ def list_versions() :
     command = f"apt-cache policy {PACKAGE_NAME}" + OPT
 
     apt_ret = subprocess.run(command, cwd=TEMP_DIR, shell=True, capture_output=False)
-    
+
 
 def main():
 
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         logger.critical(f"Uncaught exception : {e}")
-        
+
         traceback.print_exc()
-        
+
         sys.exit(1)

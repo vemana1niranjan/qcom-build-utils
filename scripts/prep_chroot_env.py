@@ -72,7 +72,7 @@ def main():
     logger.warning(f"The chroot will be created in {CHROOT_DIR}/{CHROOT_NAME}")
     logger.warning(f"Its config will be stored as /etc/schroot/chroot.d/{CHROOT_NAME}-xxxx")
 
-    # this command creates a chroot environment that will be named "{DIST}-{ARCH}-{SUFFIX}"
+    # this command creates a chroot environment that will be named "{DIST}-{ARCH}-{SUFFIX}" (note the explicit '-' in  --chroot-suffix)
     # We supply our own suffix, otherwise sbuild will use 'sbuild'
     cmd = f"sbuild-createchroot --arch={ARCH}" \
                              f" --chroot-suffix=-{SUFFIX}" \

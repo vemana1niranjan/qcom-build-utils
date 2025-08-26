@@ -86,6 +86,13 @@ jobs:
 
           echo "PPA_PACKAGES_FILE_REPO_PATH=dists/$CODENAME/stable/main/binary-$ARCH" >> $GITHUB_ENV
 
+      - name: Validate Or Create Chroot Environment
+        run: |
+          ./qcom-build-utils/scripts/prep_chroot_env.py \
+            --arch        ${{ env.PRODUCT_ARCH }} \
+            --os-codename ${{ env.PRODUCT_CODENAME }} \
+            --suffix      ${{ env.PRODUCT_DISTRO }}
+
       - name: Build .dsc
         run: dpkg-source -b .
 
@@ -105,27 +112,28 @@ jobs:
             cp -r debian/ WORKSPACE/sources/${{ github.event.repository.name }}
             cp -r qcom-example-package-source WORKSPACE/sources/${{ github.event.repository.name }}
 
-      - name: Validate Or Create Chroot Environment
-        run: |
-          ./qcom-build-utils/scripts/prep_chroot_env.py \
-            --arch        ${{ env.PRODUCT_ARCH }} \
-            --os-codename ${{ env.PRODUCT_CODENAME }} \
-            --suffix      ${{ env.PRODUCT_DISTRO }}
-
       - name: Build Debian Packages
         run: |
           ./qcom-build-utils/scripts/build.py \
             --workspace ./WORKSPACE \
             --gen-debians
 
-      - name : Download Latest Homologous Package From PPA To Compare ABI Against
+      - name : Download Latest Version Of The Built Package From PPA To Compare ABI Against
         run: |
           set +e
           ./qcom-build-utils/scripts/ppa_interface.py \
             --operation download \
             --apt-config "deb [arch=${{ env.PRODUCT_ARCH }} trusted=yes] ${{ env.PPA_URL }} ${{ env.PRODUCT_CODENAME }}/stable main" \
             --package-name libqcom-example1
+
+          RET=$?
           set -e
+
+          if (( RET == 0 )); then
+            echo "✅ Successfully downloaded latest version"
+          fi
+
+          # TODO deal with other return values
 
       - name: ABI Check
         run: |
@@ -153,11 +161,11 @@ jobs:
           fi
 
           if (( RET & 1 )); then
-            echo "⚠️ABI check returned COMPATIBLE DIFF"
+            echo "⚠️ ABI check returned COMPATIBLE DIFF"
           fi
 
           if (( RET & 2 )); then
-            echo "⚠️ABI check returned INCOMPATIBLE DIFF"
+            echo "⚠️ ABI check returned INCOMPATIBLE DIFF"
           fi
 
           if (( RET & 4 )); then
@@ -166,7 +174,7 @@ jobs:
           fi
 
           if (( RET & 8 )); then
-            echo "⚠️ABI check failed because the PPA did not contained an old version for the package."
+            echo "⚠️ ABI check failed because the PPA did not contained an old version for the package."
             echo "Assumption is that this is the first time the package was build."
             echo "INITIAL_UPLOAD_TO_PPA=true" >> $GITHUB_ENV
           fi
