@@ -206,6 +206,7 @@ def create_new_directory(dirname, delete_if_exists=True):
     -------
     - SystemExit: If an error occurs while creating the directory.
     """
+
     try:
         if os.path.exists(dirname):
             # Check if the directory exists, if so delete it

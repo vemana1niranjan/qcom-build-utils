@@ -39,7 +39,7 @@ env:
   PPA_PACKAGES_FILE_REPO_PATH: null
 
 jobs:
-  build-debian-package-reusable-workflow:
+  build-debian-package:
 
     runs-on: [self-hosted, Linux, ARM64]
 
@@ -117,6 +117,15 @@ jobs:
           ./qcom-build-utils/scripts/build.py \
             --workspace ./WORKSPACE \
             --gen-debians
+
+      - name : Download Latest Homologous Package From PPA To Compare ABI Against
+        run: |
+          set +e
+          ./qcom-build-utils/scripts/ppa_interface.py \
+            --operation download \
+            --apt-config "deb [arch=${{ env.PRODUCT_ARCH }} trusted=yes] ${{ env.PPA_URL }} ${{ env.PRODUCT_CODENAME }}/stable main" \
+            --package-name libqcom-example1
+          set -e
 
       - name: ABI Check
         run: |
