@@ -52,7 +52,7 @@ jobs:
       - name: Checkout Repository And Submodules Recursively
         uses: actions/checkout@v4 # Using public GitHub action to checkout repo, see https://github.com/actions/checkout
         with:
-          path: ./package
+          path: ./package-repo
           ref: ${{ github.head_ref }}
           clean: false # A rm -rf * was done first, don't clean otherwise this would delete qcom-build-utils cloned above
           submodules: 'recursive' # Make sure all submodules are recursively checked out
@@ -61,7 +61,7 @@ jobs:
 
       - name: Exctract Product Configuration From qcom-product.conf
         run: |
-          CONFIG_FILE="package/qcom-distro-ubuntu/qcom-product.conf"
+          CONFIG_FILE="package-repo/qcom-distro-ubuntu/qcom-product.conf"
 
           DISTRO=$(grep '^Distro:' "$CONFIG_FILE" | cut -d':' -f2 | xargs)
           CODENAME=$(grep '^Codename:' "$CONFIG_FILE" | cut -d':' -f2 | xargs)
@@ -84,17 +84,31 @@ jobs:
             --os-codename ${{ env.PRODUCT_CODENAME }} \
             --suffix      ${{ env.PRODUCT_DISTRO }}
 
-      - name: Build .dsc
-        run: cd package && dpkg-source -b .
-
-      - name: Run lintian
-        run: lintian ./*.dsc
-
       - name: Prepare Workspace Structure For The Build
         run: |
             echo "Listing the content of what was checked out, exclusing .md files : "; tree -I '*.md|LICENSE.txt'
             mkdir build
+            mkdir upstream-source
+            cp -r package-repo/qcom-fastrpc-source/* upstream-source/
+            cd upstream-source
+            tar -czf ../qcom-fastrpc1_1.0.0.orig.tar.gz .
+            cd ..
+            mkdir work
+            cp -r package-repo/debian work/
+            tar -xf qcom-fastrpc1_1.0.0.orig.tar.gz -C work
 
+      - name: Build .dsc
+        run: |
+          cd work
+          dpkg-source -b .
+          cd ..
+
+      - name: Run lintian
+        run: |
+          set +e
+          lintian ./*.dsc
+          set -e
+          
       - name: Build Debian Packages
         run: |
           set +e
