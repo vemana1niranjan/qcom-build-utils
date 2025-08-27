@@ -62,6 +62,7 @@ jobs:
       - name: Checkout Repository And Submodules Recursively
         uses: actions/checkout@v4 # Using public GitHub action to checkout repo, see https://github.com/actions/checkout
         with:
+          path: ./package
           ref: ${{ github.head_ref }}
           clean: false # A rm -rf * was done first, don't clean otherwise this would delete qcom-build-utils cloned above
           submodules: 'recursive' # Make sure all submodules are recursively checked out
@@ -70,7 +71,7 @@ jobs:
 
       - name: Exctract Product Configuration From qcom-product.conf
         run: |
-          CONFIG_FILE="qcom-distro-ubuntu/qcom-product.conf"
+          CONFIG_FILE="package/qcom-distro-ubuntu/qcom-product.conf"
 
           DISTRO=$(grep '^Distro:' "$CONFIG_FILE" | cut -d':' -f2 | xargs)
           CODENAME=$(grep '^Codename:' "$CONFIG_FILE" | cut -d':' -f2 | xargs)
@@ -94,29 +95,39 @@ jobs:
             --suffix      ${{ env.PRODUCT_DISTRO }}
 
       - name: Build .dsc
-        run: dpkg-source -b .
+        run: cd package && dpkg-source -b .
 
       - name: Run lintian
-        run: lintian ../*.dsc
+        run: lintian ./*.dsc
 
-        # The build.py script expects a specific directory structure
-        # This step creates the required directories and links the example package sources to the expected location
-        # The build_deb script will go through the WORKSPACE/sources directory and find every "debian" folder and exctract the package names
-        # from the Control file and build a list of available packages to build.
       - name: Prepare Workspace Structure For The Build
         run: |
             echo "Listing the content of what was checked out, exclusing .md files : "; tree -I '*.md|LICENSE.txt'
-            mkdir WORKSPACE
-            mkdir WORKSPACE/sources
-            mkdir WORKSPACE/sources/${{ github.event.repository.name }}
-            cp -r debian/ WORKSPACE/sources/${{ github.event.repository.name }}
-            cp -r qcom-example-package-source WORKSPACE/sources/${{ github.event.repository.name }}
+            mkdir build
 
       - name: Build Debian Packages
         run: |
-          ./qcom-build-utils/scripts/build.py \
-            --workspace ./WORKSPACE \
-            --gen-debians
+          set +e
+          sbuild \
+            -A \
+            --arch=arm64 \
+            -d noble-arm64-ubuntu \
+            --no-run-lintian \
+            --build-dir ./build \
+            --build-dep-resolver=apt \
+            --extra-repository="deb [arch=arm64 trusted=yes] http://pkg.qualcomm.com noble/stable main" \
+            ./*.dsc
+          RET=$?
+          set -e
+
+          if (( RET == 0 )); then
+            echo "✅ Successfully built package"
+          else
+            # Print the real .build log, not the symlink
+            tail -n 500 $(find ./build -maxdepth 1 -name "*.build" ! -type l)
+            echo "❌ Build failed, printed the last 500 lines of the build log file"
+            exit 1
+          fi
 
       - name : Download Latest Version Of The Built Package From PPA To Compare ABI Against
         run: |
@@ -140,7 +151,7 @@ jobs:
           set +e
 
           ./qcom-build-utils/scripts/deb_abi_checker.py \
-            --new-package-dir ./WORKSPACE/debian_packages/temp/${{ github.event.repository.name }} \
+            --new-package-dir ./build \
             --apt-server-config "deb [arch=${{ env.PRODUCT_ARCH }} trusted=yes] ${{ env.PPA_URL }} ${{ env.PRODUCT_CODENAME }}/stable main" \
             --result-file ./results.txt
 
