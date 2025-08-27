@@ -3,19 +3,9 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: The ref name thad was used to invoke this reusable workflow
+        description: The ref name that was used to invoke this reusable workflow
         type: string
         required: true
-      use_local_ppa:
-        description: 'Whether to use a local PPA for testing'
-        type: boolean
-        required: false
-        default: true
-      clear_ppa: # Assuming this might also be an input for the reusable workflow
-        description: 'Whether to clear the PPA'
-        type: boolean
-        required: false
-        default: false
     secrets:
       ACTIONS_SSH_KEY:
         required: true
