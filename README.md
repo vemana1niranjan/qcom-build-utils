@@ -65,4 +65,3 @@ Bootable images:
     - efiesp.bin
     - ubuntu.img
 ```
-
