@@ -77,6 +77,9 @@ jobs:
 
           echo "PPA_PACKAGES_FILE_REPO_PATH=dists/$CODENAME/stable/main/binary-$ARCH" >> $GITHUB_ENV
 
+      # Based on the information extracted from qcom-product.conf, verify if the chroot {CODENAME}-{ARCH}-{DISTRO} exists,
+      # and if not, create it.
+      # TODO : if it doesnt exist, the script needs to be run as root to create it. Find how to use sudo from here.
       - name: Validate Or Create Chroot Environment
         run: |
           ./qcom-build-utils/scripts/prep_chroot_env.py \
@@ -84,18 +87,33 @@ jobs:
             --os-codename ${{ env.PRODUCT_CODENAME }} \
             --suffix      ${{ env.PRODUCT_DISTRO }}
 
+      # Prepare the directory structures necessary depending on format is quilt or native
       - name: Prepare Workspace Structure For The Build
         run: |
             echo "Listing the content of what was checked out, exclusing .md files : "; tree -I '*.md|LICENSE.txt'
+
             mkdir build
-            mkdir upstream-source
-            cp -r package-repo/qcom-fastrpc-source/* upstream-source/
-            cd upstream-source
-            tar -czf ../qcom-fastrpc1_1.0.0.orig.tar.gz .
-            cd ..
-            mkdir work
-            cp -r package-repo/debian work/
-            tar -xf qcom-fastrpc1_1.0.0.orig.tar.gz -C work
+
+            if grep -q 'quilt' ./package-repo/debian/source/format; then
+              echo "Source format is quilt"
+              
+              mkdir upstream-source
+              cp -r package-repo/qcom-fastrpc-source/* upstream-source/
+              cd upstream-source
+              tar -czf ../qcom-fastrpc1_1.0.0.orig.tar.gz .
+              cd ..
+              mkdir work
+              cp -r package-repo/debian work/
+              tar -xf qcom-fastrpc1_1.0.0.orig.tar.gz -C work
+
+            elif grep -q 'native' ./package-repo/debian/source/format; then
+              echo "Source format is native"
+              mkdir work
+              cp -r package-repo/* work/
+            else
+              echo "Source format is unknown or unsupported"
+              exit 1
+            fi
 
       - name: Build .dsc
         run: |
@@ -103,6 +121,8 @@ jobs:
           dpkg-source -b .
           cd ..
 
+      # Run lintian to see if the package is well formatted
+      # TODO make it fail if there are errors, and perhaps add a -Werror kind of input
       - name: Run lintian
         run: |
           set +e
