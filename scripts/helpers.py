@@ -15,13 +15,10 @@ import stat
 import shlex
 import random
 import shutil
-import logging
 import subprocess
 import glob
 from pathlib import Path
 from git import Repo
-from apt_server import AptServer
-from constants import TERMINAL, HOST_FS_MOUNT
 from color_logger import logger
 
 def check_and_append_line_in_file(file_path, line_to_check, append_if_missing=False):
