@@ -108,7 +108,7 @@ jobs:
           set +e
           lintian ./*.dsc
           set -e
-          
+
       - name: Build Debian Packages
         run: |
           set +e
@@ -228,17 +228,7 @@ jobs:
       - name: Upload Debian Packages To PPA Server If First Build
         if: ${{ env.INITIAL_UPLOAD_TO_PPA == 'true' }}
         run: |
-          echo "Uploading Debian Package To PPA Server : ${{ env.PPA_URL }}"
-          
-          for dir in ./WORKSPACE/debian_packages/oss/*/; do
-            PACKAGE=$(basename $dir)
-            echo "Creating directory for package $PACKAGE" in the PPA
-            mkdir -p ./qcom-oss-staging-ppa/pool/${{env.PRODUCT_CODENAME}}/stable/main/$PACKAGE
-
-            echo "Packages to copy for $PACKAGE: "; ls ./WORKSPACE/debian_packages/oss/$PACKAGE
-
-            cp ./WORKSPACE/debian_packages/oss/$PACKAGE/* ./qcom-oss-staging-ppa/pool/${{env.PRODUCT_CODENAME}}/stable/main/$PACKAGE
-          done
+          ./qcom-build-utils/scripts/ppa_organizer.py --build-dir ./build --output-dir ./qcom-oss-staging-ppa/pool/${{env.PRODUCT_CODENAME}}/stable/main
 
           cd ./qcom-oss-staging-ppa
 
