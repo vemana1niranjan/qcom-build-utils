@@ -4,11 +4,13 @@ on:
     branches:
       - main
       - latest
+      - internal
 
   push:
     branches:
       - main
       - latest
+      - internal
 
   workflow_dispatch:
 
