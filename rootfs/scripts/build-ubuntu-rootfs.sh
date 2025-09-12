@@ -62,6 +62,7 @@ KERNEL_DEB=""
 FIRMWARE_DEB=""
 USE_CONF=0
 USE_MANIFEST=0
+TARGET=""
 
 if [[ $# -eq 4 ]]; then
     CONF="$1"
@@ -85,6 +86,7 @@ elif [[ $# -eq 3 ]]; then
         FIRMWARE_DEB="$2"
         USE_CONF=0
         USE_MANIFEST=0
+        TARGET="$3"
     fi
 elif [[ $# -eq 2 ]]; then
     CONF=""
@@ -399,7 +401,17 @@ crd_dtb_path=\"/lib/firmware/\$kernel_ver/device-tree/x1e80100-crd.dtb\"
 echo '[CHROOT] Writing GRUB configuration...'
 tee /boot/grub.cfg > /dev/null <<GRUBCFG
 set timeout=5
-set default=${CODENAME}_crd
+\#set default=${CODENAME}_crd
+set default=\"QLI\"
+if [ "$TARGET" == \"hamoa\"  ]; then
+        set default=\"hamoa\"
+fi
+menuentry \"Ubuntu QLI IoT for X Elite CRD\" --id QLI {
+    search --no-floppy --label system --set=root
+    linux /boot/vmlinuz-\$kernel_ver earlycon console=ttyMSM0,115200n8 root=LABEL=system cma=128M rw clk_ignore_unused pd_ignore_unused efi=noruntime rootwait ignore_loglevel
+    initrd /boot/initrd.img-\$kernel_ver
+}
+
 menuentry \"Ubuntu ${CODENAME} IoT for X Elite CRD\" --id ${CODENAME}_crd {
     search --no-floppy --label system --set=root
     devicetree \$crd_dtb_path
