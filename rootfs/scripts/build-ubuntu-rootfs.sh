@@ -418,7 +418,7 @@ echo '[CHROOT] Base package list preserved as /tmp/\${CODENAME}_base.manifest'
 echo '[CHROOT] Custom installed packages saved to /tmp/packages_\${DATE}.manifest'
 
 echo '[CHROOT] Detecting installed kernel version...'
-kernel_ver=\$(echo "$KERNEL_DEB" | sed -n 's/linux-kernel-\(.*\)-arm64\.deb/\1/p')
+kernel_ver=\$(echo "$KERNEL_DEB" | sed -n 's|.*/linux-kernel-\(.*\)-arm64\.deb|\1|p')
 crd_dtb_path=\"/lib/firmware/\$kernel_ver/device-tree/x1e80100-crd.dtb\"
 
 echo '[CHROOT] Writing GRUB configuration...'
