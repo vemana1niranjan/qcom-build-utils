@@ -1,0 +1,35 @@
+name: Container Build And Upload
+description: |
+  Builds and uploads to GHCR (GitHub Container Registry) the container used to build the packages
+  
+on:
+  workflow_dispatch:
+    inputs:
+      test:
+        description: no description
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  security-events: write
+
+env:
+  GITHUB_SERVICE_BOT_USERNAME: "qcom-service-bot"
+
+  QCOM_ORG_NAME: "qualcomm-linux"
+
+  IMAGE_NAME: "pkg-builder"
+
+jobs:
+  container-build-and-upload:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Authenticate to GHCR
+        run: echo ${{ secrets.DEB_PKG_BOT_CI_TOKEN }} | docker login ghcr.io -u ${{env.GITHUB_SERVICE_BOT_USERNAME}} --password-stdin
+
+      - name: Build and Tag the Image
+        run: docker build -t ghcr.io/${{env.QCOM_ORG_NAME}}/${{env.IMAGE_NAME}}:latest .
