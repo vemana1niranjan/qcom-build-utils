@@ -92,7 +92,7 @@ jobs:
           path: ./package-repo
           fetch-depth: 0
 
-      - name: Fetch All Branches and Tags
+      - name: Show branches/tags and checkout debian/upstream latest
         run: |
           cd ./package-repo
 
@@ -131,7 +131,7 @@ jobs:
       - name: Add Upstream Link As A Remote And Fetch Tags
         run: |
           cd ./package-repo
-          git remote add upstream-source git@github.com:${{inputs.upstream-repo}}.git
+          git remote add upstream-source https://x-access-token:${{secrets.TOKEN}}@github.com/${{inputs.upstream-repo}}.git
           git fetch upstream-source "+refs/tags/*:refs/tags/*"
 
       - name: Clone Upstream Repo At Specified Tag
