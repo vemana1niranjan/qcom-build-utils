@@ -41,7 +41,7 @@ env:
   NORMALIZED_VERSION: ""
   DISTRIBUTION: noble
 
-  #TODOOOOOOO : Check if a PR branch already exist. This wwould mean that someone or something triggered the
+  #TODO : Check if a PR branch already exist. This wwould mean that someone or something triggered the
   # promotion more than once before it was merged
 
 jobs:
@@ -50,8 +50,12 @@ jobs:
     runs-on: [self-hosted, Linux, ARM64]
 #   runs-on: [self-hosted, lecore-stg-u2404-arm64-xlrg-od-ephem]
 
-#   container:
-#     image: ubuntu:noble
+    # To update this container, update the /docker/Dockerfile and run the "Container Build And Upload" action
+    container:
+      image: ghcr.io/qualcomm-linux/pkg-builder:latest
+      credentials:
+        username: ${{ vars.DEB_PKG_BOT_CI_USERNAME }}
+        password: ${{ secrets.TOKEN }}
 
     steps:
 
@@ -195,7 +199,6 @@ jobs:
               -m "Filtered out .git, .github and debian from upstram, and preserved .github debian/latest" \
               upstream/latest
 
-      #TODO : Think about how to promote the distro -1 version, and if we push the tag or not
       - name: Promote Changelog
         run: |
           cd ./package-repo

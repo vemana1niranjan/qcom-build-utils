@@ -65,9 +65,12 @@ jobs:
     runs-on: [self-hosted, Linux, ARM64]
 #   runs-on: [self-hosted, lecore-stg-u2404-arm64-xlrg-od-ephem]
 
-#   container:
-#     image: ubuntu:noble
-#     options: --volume /srv/chroot:/srv/chroot
+    # To update this container, update the /docker/Dockerfile and run the "Container Build And Upload" action
+    container:
+      image: ghcr.io/qualcomm-linux/pkg-builder:latest
+      credentials:
+        username: ${{ vars.DEB_PKG_BOT_CI_USERNAME }}
+        password: ${{ secrets.TOKEN }}
 
     steps:
 
