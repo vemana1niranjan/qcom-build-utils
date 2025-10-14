@@ -174,9 +174,9 @@ jobs:
         run: |
           cd ./package-repo
 
-          git config user.name "Github Service Bot"
-          git config user.email "githubservice@qti.qualcomm.com"
-
+          git config user.name "${{vars.DEB_PKG_BOT_CI_NAME}}"
+          git config user.email "${{vars.DEB_PKG_BOT_CI_EMAIL}}"
+          
           git checkout -b debian/pr/${{env.NORMALIZED_VERSION}}-1
 
           # Run gbp with --no-merge, this is because we do not want gbp to perform the final merging of upstream/latest into debian/latest
@@ -211,8 +211,8 @@ jobs:
         run: |
           cd ./package-repo
 
-          export DEBFULLNAME="Github Service Bot"
-          export DEBEMAIL=githubservice@qti.qualcomm.com
+          export DEBFULLNAME="${{vars.DEB_PKG_BOT_CI_NAME}}"
+          export DEBEMAIL="${{vars.DEB_PKG_BOT_CI_EMAIL}}"
 
           # use ignore branch because we are not on default debian branch
           gbp dch \
