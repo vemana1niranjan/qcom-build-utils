@@ -5,10 +5,10 @@ description: |
 on:
   workflow_dispatch:
     inputs:
-      test:
-        description: no description
-        type: boolean
-        default: false
+      variant:
+        description: The variant name to be appended to the image name, default is 'latest'
+        type: string
+        default: latest
 
 permissions:
   contents: read
@@ -31,13 +31,13 @@ jobs:
         with:
           ref: ${{github.head_ref}}
           sparse-checkout: docker/Dockerfile
-          sparse-checkout-cone-mode: false # <- Set to off for single file
+          sparse-checkout-cone-mode: false # single file -> false
 
       - name: Authenticate to GHCR
         run: echo ${{ secrets.DEB_PKG_BOT_CI_TOKEN }} | docker login ghcr.io -u ${{ vars.DEB_PKG_BOT_CI_USERNAME }} --password-stdin
 
-      - name: tree
-        run: tree
-
       - name: Build and Tag the Image
-        run: docker build -t ghcr.io/${{env.QCOM_ORG_NAME}}/${{env.IMAGE_NAME}}:latest ./docker
+        run: docker build -t ghcr.io/${{env.QCOM_ORG_NAME}}/${{env.IMAGE_NAME}}:${{inputs.variant}} ./docker
+
+      - name: Push
+        run: docker push ghcr.io/${{env.QCOM_ORG_NAME}}/${{env.IMAGE_NAME}}:${{inputs.variant}}

@@ -11,14 +11,13 @@ RUN apt-get update && apt-get install -y \
     git \
     git-buildpackage \
     sbuild \
+    gh \
     debootstrap \
     tree \
     build-essential \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-    # gh
-    
 # Set working directory
 WORKDIR /app
 
