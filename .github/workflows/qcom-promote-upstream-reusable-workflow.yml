@@ -55,17 +55,6 @@ jobs:
 
     steps:
 
-#     - name: Install dependencies
-#       run: |
-#         apt-get update
-#         apt-get install -y git git-buildpackage
-
-      - name: Check Dependencies
-        run: |
-          git --version
-          gbp --version
-          gh --version
-
       - name: Ensure Workspace Is Clean
         run: rm -rf *
 

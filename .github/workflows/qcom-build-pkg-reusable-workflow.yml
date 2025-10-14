@@ -71,11 +71,6 @@ jobs:
 
     steps:
 
-#     - name: Install dependencies
-#       run: |
-#         apt-get update
-#         apt-get install -y git git-buildpackage sbuild debootstrap tree
-
       - name: Ensure Workspace Is Clean
         run: rm -rf *
 
