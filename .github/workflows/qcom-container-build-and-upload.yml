@@ -26,8 +26,18 @@ jobs:
 
     steps:
 
+      - name: Checkout Dockerfile
+        uses: actions/checkout@v4
+        with:
+          ref: ${{github.head_ref}}
+          sparse-checkout: docker/Dockerfile
+          sparse-checkout-cone-mode: false # <- Set to off for single file
+
       - name: Authenticate to GHCR
         run: echo ${{ secrets.DEB_PKG_BOT_CI_TOKEN }} | docker login ghcr.io -u ${{ vars.DEB_PKG_BOT_CI_USERNAME }} --password-stdin
 
+      - name: tree
+        run: tree
+
       - name: Build and Tag the Image
-        run: docker build -t ghcr.io/${{env.QCOM_ORG_NAME}}/${{env.IMAGE_NAME}}:latest .
+        run: docker build -t ghcr.io/${{env.QCOM_ORG_NAME}}/${{env.IMAGE_NAME}}:latest ./docker
