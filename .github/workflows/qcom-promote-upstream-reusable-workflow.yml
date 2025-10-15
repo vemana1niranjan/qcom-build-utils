@@ -49,7 +49,10 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    # To update this container, update the /docker/Dockerfile and run the "Container Build And Upload" action
+    defaults:
+      run:
+        shell: bash
+
     container:
       image: ghcr.io/qualcomm-linux/pkg-builder:latest
       credentials:
