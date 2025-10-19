@@ -18,8 +18,8 @@ on:
         required: true
         default: debian/latest
 
-      ubuntu-codename:
-        description: The ubuntu codename to build for. Ex noble, jammy, etc
+      ubuntu-distribution:
+        description: The ubuntu distribution to build for. Ex noble, jammy, etc
         type: string
         default: noble
 
@@ -43,6 +43,11 @@ on:
         type: boolean
         default: false
 
+      runner:
+        description: The runner to use for the build
+        type: string
+        default: ubuntu-latest
+
     secrets:
       TOKEN:
         required: true
@@ -55,29 +60,25 @@ env:
   REPO_URL: https://qualcomm-linux.github.io/pkg-oss-staging-repo/
   REPO_NAME: qualcomm-linux/pkg-oss-staging-repo
 
-  UBUNTU_CODENAME: ${{inputs.ubuntu-codename}}
-  DISTRO: ubuntu
-  ARCH: arm64
+  UBUNTU_DISTRIBUTION: ${{inputs.ubuntu-distribution}}
 
 jobs:
   build-debian-package:
 
-    runs-on: [self-hosted, Linux, ARM64]
-#   runs-on: [self-hosted, lecore-stg-u2404-arm64-xlrg-od-ephem]
+    runs-on: ${{inputs.runner}}
 
-#   container:
-#     image: ubuntu:noble
-#     options: --volume /srv/chroot:/srv/chroot
+    defaults:
+      run:
+        shell: bash
+
+    container:
+      image: ghcr.io/qualcomm-linux/pkg-builder:${{inputs.runner == 'ubuntu-latest' && 'amd64' || 'arm64'}}-latest
+      options: --privileged
+      credentials:
+        username: ${{vars.DEB_PKG_BOT_CI_USERNAME}}
+        password: ${{secrets.TOKEN}}
 
     steps:
-
-#     - name: Install dependencies
-#       run: |
-#         apt-get update
-#         apt-get install -y git git-buildpackage sbuild debootstrap tree
-
-      - name: Ensure Workspace Is Clean
-        run: rm -rf *
 
       - name: Checkout qcom-build-utils
         uses: actions/checkout@v4
@@ -106,7 +107,7 @@ jobs:
           pkg-dir: package-repo
           build-dir: build-area
           run-lintian: ${{inputs.run-lintian}}
-          
+
       - name: Run ABI (Application Binary Interface) Check
         if: ${{inputs.run-abi-checker == true}}
         uses: ./qcom-build-utils/.github/actions/abi_checker
