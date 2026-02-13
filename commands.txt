@@ -1,0 +1,5 @@
+#command to build dcoker image
+sudo docker build -t debian-rootfs-builder .
+
+#command to run docker
+sudo docker run -it --privileged -v $(pwd)/rootfs:/rootfs debian-rootfs-builder
